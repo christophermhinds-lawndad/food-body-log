@@ -21,7 +21,7 @@ const titles = {
 const statusNodes = {
   installMode: document.querySelector("#install-mode-status"),
   offlineCache: document.querySelector("#offline-cache-status"),
-  localStorage: document.querySelector("#local-storage-status"),
+  storage: document.querySelector("#local-storage-status"),
   message: document.querySelector("#settings-message"),
 };
 
@@ -67,14 +67,14 @@ async function readStoredStatus() {
   const stored = await readSetupStatus();
 
   if (stored.available && stored.value) {
-    setStatus(statusNodes.localStorage, stored.value.storage || "Ready");
+    setStatus(statusNodes.storage, stored.value.storage || "Ready");
   }
 }
 
 async function checkInstallStatus() {
   setStatus(statusNodes.installMode, "Checking");
   setStatus(statusNodes.offlineCache, "Checking");
-  setStatus(statusNodes.localStorage, "Checking");
+  setStatus(statusNodes.storage, "Checking");
   statusNodes.message.textContent = "Checking offline app shell...";
 
   const storageResult = await writeSetupStatus({
@@ -88,7 +88,7 @@ async function checkInstallStatus() {
   const cacheStatus = storageResult.value?.offlineCache || "Not ready";
 
   setStatus(statusNodes.installMode, storageResult.value?.installMode || getInstallMode());
-  setStatus(statusNodes.localStorage, storageReady ? "Ready" : "Unavailable");
+  setStatus(statusNodes.storage, storageReady ? "Ready" : "Unavailable");
   setStatus(statusNodes.offlineCache, cacheStatus);
 
   statusNodes.message.textContent =
