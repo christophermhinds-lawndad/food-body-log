@@ -167,7 +167,7 @@ function installFakeIndexedDb() {
   globalThis.indexedDB = {
     open(name, version) {
       assert.equal(name, "food-body-log");
-      assert.equal(version, 2);
+      assert.equal(version, 3);
 
       const request = { result: db, error: null };
       queueMicrotask(() => {
