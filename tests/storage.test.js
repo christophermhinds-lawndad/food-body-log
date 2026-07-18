@@ -86,7 +86,7 @@ function installFakeIndexedDb() {
   globalThis.indexedDB = {
     open(name, version) {
       assert.equal(name, "food-body-log");
-      assert.equal(version, 2);
+      assert.equal(version, 3);
 
       const request = { result: db, error: null };
       queueMicrotask(() => {
@@ -100,7 +100,7 @@ function installFakeIndexedDb() {
   return db;
 }
 
-test("storage adapter opens version 2 settings and daily tracking stores", async () => {
+test("storage adapter opens version 3 settings, daily tracking, and journal stores", async () => {
   const db = installFakeIndexedDb();
   const storage = await import("../public/scripts/storage.js");
 
@@ -110,16 +110,19 @@ test("storage adapter opens version 2 settings and daily tracking stores", async
   });
 
   assert.equal(writeResult.available, true);
-  assert.deepEqual(Array.from(db.stores.keys()).sort(), ["days", "meals", "settings", "weights"]);
+  assert.deepEqual(Array.from(db.stores.keys()).sort(), ["days", "journalAnswers", "meals", "settings", "weights"]);
   assert.equal(db.stores.get("settings").keyPath, "key");
   assert.equal(db.stores.get("days").keyPath, "dayID");
   assert.equal(db.stores.get("meals").keyPath, "id");
   assert.equal(db.stores.get("weights").keyPath, "dayID");
+  assert.equal(db.stores.get("journalAnswers").keyPath, "id");
   assert.ok(db.stores.get("meals").indexes.has("byDay"));
   assert.ok(db.stores.get("meals").indexes.has("byDaySlot"));
+  assert.ok(db.stores.get("journalAnswers").indexes.has("byDay"));
+  assert.ok(db.stores.get("journalAnswers").indexes.has("byBreakthrough"));
 });
 
-test("storage upgrade preserves existing settings store while adding daily stores", async () => {
+test("storage upgrade preserves existing stores while adding journal answers", async () => {
   const db = installFakeIndexedDb();
   db.createObjectStore("settings", { keyPath: "key" });
   db.stores.get("settings").records.set("setup-status", {
@@ -133,9 +136,11 @@ test("storage upgrade preserves existing settings store while adding daily store
 
   assert.equal(readBeforeWrite.available, true);
   assert.equal(readBeforeWrite.value.storage, "Ready before upgrade");
-  assert.deepEqual(Array.from(db.stores.keys()).sort(), ["days", "meals", "settings", "weights"]);
+  assert.deepEqual(Array.from(db.stores.keys()).sort(), ["days", "journalAnswers", "meals", "settings", "weights"]);
   assert.equal(db.stores.get("settings").records.size, 1);
   assert.equal(db.stores.get("meals").indexes.get("byDaySlot").options.unique, true);
+  assert.equal(db.stores.get("journalAnswers").indexes.get("byDay").keyPath, "dayID");
+  assert.equal(db.stores.get("journalAnswers").indexes.get("byBreakthrough").keyPath, "breakthroughState");
 });
 
 test("setup status writes update one stable settings record", async () => {
