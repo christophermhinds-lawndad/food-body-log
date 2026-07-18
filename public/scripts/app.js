@@ -27,6 +27,7 @@ const weightMessage = document.querySelector("#weight-message");
 const todayDate = document.querySelector("#today-date");
 const planForm = document.querySelector("#plan-form");
 const planMessage = document.querySelector("#plan-message");
+const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded. You can keep typing.";
 let todayDayID = getTodayDayID();
 let planDayID = getTomorrowDayID();
 let planSuggestionRequestID = 0;
@@ -252,6 +253,7 @@ async function updatePlanSuggestions(input) {
   const requestID = ++planSuggestionRequestID;
 
   if (!slot || !query.trim()) {
+    clearSuggestionFailureMessage();
     hidePlanSuggestions(input);
     return;
   }
@@ -263,11 +265,12 @@ async function updatePlanSuggestions(input) {
   }
 
   if (!isReadyResult(result)) {
-    setText(planMessage, "Suggestions could not be loaded. You can keep typing.");
+    setText(planMessage, SUGGESTION_ERROR_MESSAGE);
     hidePlanSuggestions(input);
     return;
   }
 
+  clearSuggestionFailureMessage();
   renderPlanSuggestions(input, result.suggestions);
 }
 
@@ -286,7 +289,14 @@ function renderPlanSuggestions(input, suggestions) {
     button.type = "button";
     button.className = "plan-suggestion-option";
     setText(button, suggestion);
-    button.addEventListener("click", () => applyPlanSuggestion(input, suggestion));
+    button.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      applyPlanSuggestion(input, suggestion);
+    });
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      applyPlanSuggestion(input, suggestion);
+    });
     list.append(button);
   }
 
@@ -323,9 +333,16 @@ function applyPlanSuggestion(input, suggestionText) {
     return;
   }
 
+  clearSuggestionFailureMessage();
   input.value = suggestionText;
   hidePlanSuggestions(input);
   input.focus({ preventScroll: true });
+}
+
+function clearSuggestionFailureMessage() {
+  if (planMessage?.textContent === SUGGESTION_ERROR_MESSAGE) {
+    setText(planMessage, "");
+  }
 }
 
 function planSuggestionList(inputOrSlot) {

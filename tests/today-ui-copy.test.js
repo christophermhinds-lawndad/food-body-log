@@ -142,13 +142,17 @@ test("plan suggestions render safely and stay outside the save path", () => {
   assert.match(appSource, /setText\(button, suggestion\)/);
   assert.doesNotMatch(appSource, /plan-suggestion[\s\S]{0,500}\.innerHTML\s*=/);
   assert.match(appSource, /button\.type = "button"/);
+  assert.match(appSource, /button\.addEventListener\("pointerdown", \(event\) => \{\n\s+event\.preventDefault\(\);\n\s+applyPlanSuggestion\(input, suggestion\);/);
+  assert.match(appSource, /button\.addEventListener\("click", \(event\) => \{\n\s+event\.preventDefault\(\);\n\s+applyPlanSuggestion\(input, suggestion\);/);
   assert.match(appSource, /function applyPlanSuggestion\(input, suggestionText\)/);
   assert.doesNotMatch(appSource, /function applyPlanSuggestion[\s\S]*savePlan\(/);
   assert.doesNotMatch(appSource, /dataset\.planSlot !== "breakfast"/);
 });
 
 test("plan suggestion failure copy is non-blocking and UAT tracks visual backstops", () => {
-  assert.match(appSource, /Suggestions could not be loaded\. You can keep typing\./);
+  assert.match(appSource, /const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded\. You can keep typing\."/);
+  assert.match(appSource, /function clearSuggestionFailureMessage\(\)/);
+  assert.match(appSource, /planMessage\?\.textContent === SUGGESTION_ERROR_MESSAGE/);
   assert.match(appSource, /hideAllPlanSuggestions\(\);/);
   assert.match(appSource, /document\.addEventListener\("pointerdown"/);
   assert.match(appSource, /planForm\?\.addEventListener\("focusout"/);
