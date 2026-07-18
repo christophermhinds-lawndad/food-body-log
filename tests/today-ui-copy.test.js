@@ -5,6 +5,7 @@ import test from "node:test";
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
+const repositorySource = await readFile(new URL("../public/scripts/today-tracking.js", import.meta.url), "utf8");
 const phaseUat = await readOptionalFile(new URL("../.planning/phases/02-today-tracking-loop/02-UAT.md", import.meta.url));
 
 const forbiddenVisibleCopy = [
@@ -22,6 +23,13 @@ const forbiddenVisibleCopy = [
   "bad foods",
   "on track",
   "off track",
+  "recommended",
+  "best match",
+  "healthy",
+  "good choice",
+  "should eat",
+  "score",
+  "external source",
 ];
 
 test("today and plan surfaces include the required Phase 2 copy", () => {
@@ -126,6 +134,27 @@ test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () =
   for (const forbidden of forbiddenVisibleCopy) {
     assert.doesNotMatch(visibleRuntimeSource, new RegExp(escapeRegExp(forbidden)), `forbidden visible copy: ${forbidden}`);
   }
+});
+
+test("plan suggestions render safely and stay outside the save path", () => {
+  assert.match(appSource, /function renderPlanSuggestions\(input, suggestions\)/);
+  assert.match(appSource, /setText\(button, suggestion\)/);
+  assert.doesNotMatch(appSource, /plan-suggestion[\s\S]{0,500}\.innerHTML\s*=/);
+  assert.match(appSource, /button\.type = "button"/);
+  assert.match(appSource, /function applyPlanSuggestion\(input, suggestionText\)/);
+  assert.doesNotMatch(appSource, /function applyPlanSuggestion[\s\S]*savePlan\(/);
+  assert.doesNotMatch(appSource, /dataset\.planSlot !== "breakfast"/);
+});
+
+test("plan suggestions stay local-only without external or package artifacts", async () => {
+  const packageJson = await readOptionalFile(new URL("../package.json", import.meta.url));
+  const packageLock = await readOptionalFile(new URL("../package-lock.json", import.meta.url));
+  const runtimeSource = `${appSource}\n${repositorySource}`;
+
+  assert.match(repositorySource, /objectStore\(MEALS_STORE\)\.getAll\(\)/);
+  assert.doesNotMatch(runtimeSource, /\bfetch\(|XMLHttpRequest|navigator\.sendBeacon|https?:\/\//);
+  assert.equal(packageJson, "");
+  assert.equal(packageLock, "");
 });
 
 test("meal logging surface excludes notes, reflection prompts, chips, and emotion controls", () => {

@@ -59,3 +59,20 @@ test("today and plan shell expose the Phase 2 tracer surfaces", () => {
   assert.match(html, /data-view="plan"/);
   assert.doesNotMatch(html, /required[^>]+data-plan-slot/);
 });
+
+test("plan shell gives every meal field an associated inline suggestion container", () => {
+  const slotIDs = {
+    breakfast: "plan-breakfast",
+    lunch: "plan-lunch",
+    dinner: "plan-dinner",
+    snack: "plan-snack",
+  };
+
+  for (const [slot, inputID] of Object.entries(slotIDs)) {
+    const suggestionID = `${inputID}-suggestions`;
+    assert.match(html, new RegExp(`<input[^>]+id="${inputID}"[^>]+data-plan-slot="${slot}"[^>]+aria-controls="${suggestionID}"`), `missing aria-controls for ${slot}`);
+    assert.match(html, new RegExp(`id="${suggestionID}"[^>]+data-plan-suggestions="${slot}"[^>]+hidden`), `missing suggestion container for ${slot}`);
+  }
+
+  assert.equal((html.match(/data-plan-suggestions=/g) || []).length, 4);
+});

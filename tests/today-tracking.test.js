@@ -308,6 +308,29 @@ test("tracking model ranks planned text suggestions by normalized shared words",
   assert.deepEqual(model.rankPlannedTextSuggestions("   ", [{ plannedText: "Peanut butter toast" }]), []);
 });
 
+test("planned text suggestions cap, dedupe, and tie-break deterministically", async () => {
+  const { model } = await loadTrackingModules("model-suggestions-expanded");
+
+  const meals = [
+    { plannedText: "Peanut butter toast", updatedAt: "2026-07-15T19:30:00.000Z" },
+    { plannedText: "Peanut butter toast  ", updatedAt: "2026-07-18T19:30:00.000Z" },
+    { plannedText: "Peanut soup", updatedAt: "2026-07-17T19:30:00.000Z" },
+    { plannedText: "Peanut salad", updatedAt: "2026-07-16T19:30:00.000Z" },
+    { plannedText: "Peanut apple", updatedAt: "2026-07-14T19:30:00.000Z" },
+    { plannedText: "Toast and jam", updatedAt: "2026-07-19T19:30:00.000Z" },
+  ];
+
+  assert.deepEqual(model.rankPlannedTextSuggestions("peanut", meals), [
+    "Peanut soup",
+    "Peanut salad",
+    "Peanut butter toast",
+  ]);
+  assert.deepEqual(model.rankPlannedTextSuggestions("toast", meals, { limit: 2 }), [
+    "Toast and jam",
+    "Peanut butter toast",
+  ]);
+});
+
 test("plan saves update supplied slots without resetting sibling log state or answers", async () => {
   const { model, repository } = await loadTrackingModules("partial-plan");
   const later = new Date(2026, 6, 18, 9, 15, 0);
