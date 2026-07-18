@@ -40,7 +40,9 @@ export async function savePlan(dayID, plannedTextBySlot, options = {}) {
     const meals = await ensureMealsForDay(db, dayID, options);
     const updates = meals.map((meal) => ({
       ...meal,
-      plannedText: normalizePlannedText(plannedTextBySlot?.[meal.slot]),
+      plannedText: hasPlannedTextForSlot(plannedTextBySlot, meal.slot)
+        ? normalizePlannedText(plannedTextBySlot[meal.slot])
+        : meal.plannedText,
       updatedAt: nowIso(options),
     }));
 
@@ -62,7 +64,28 @@ export async function saveMealLog(dayID, slot, answers = {}) {
     await ensureMealsForDay(db, dayID, answers);
 
     const existingMeal = await getMeal(db, dayID, selectedSlot.id);
-    const loggedMeal = applyLoggedMeal(existingMeal, answers);
+    let loggedMeal;
+
+    try {
+      loggedMeal = applyLoggedMeal(existingMeal, answers);
+    } catch (error) {
+      if (error instanceof TypeError) {
+        return {
+          status: "Invalid",
+          day,
+          meals: await ensureMealsForDay(db, dayID, answers),
+          weight: await getWeight(db, dayID),
+          error: {
+            code: "partial-metric-answers",
+            dayID,
+            slot: selectedSlot.id,
+          },
+        };
+      }
+
+      throw error;
+    }
+
     await putRecord(db, MEALS_STORE, loggedMeal);
 
     return {
@@ -249,4 +272,8 @@ function getMealsByDay(db, dayID) {
 function nowIso(options = {}) {
   const now = options.now || new Date();
   return (now instanceof Date ? now : new Date(now)).toISOString();
+}
+
+function hasPlannedTextForSlot(plannedTextBySlot, slot) {
+  return Object.prototype.hasOwnProperty.call(plannedTextBySlot || {}, slot);
 }
