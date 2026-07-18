@@ -86,7 +86,21 @@ export async function saveMealLog(dayID, slot, answers = {}) {
       throw error;
     }
 
-    await putRecord(db, MEALS_STORE, loggedMeal);
+    try {
+      await putRecord(db, MEALS_STORE, loggedMeal);
+    } catch {
+      return {
+        status: "Error",
+        day,
+        meals: await ensureMealsForDay(db, dayID, answers),
+        weight: await getWeight(db, dayID),
+        error: {
+          code: "meal-save-failed",
+          dayID,
+          slot: selectedSlot.id,
+        },
+      };
+    }
 
     return {
       status: "Ready",
