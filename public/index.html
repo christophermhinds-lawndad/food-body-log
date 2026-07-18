@@ -22,6 +22,7 @@
 
       <main id="app-content" class="app-main" tabindex="-1">
         <section class="view-panel today-view" data-view="today">
+          <p id="today-date" class="date-heading">Today</p>
           <section class="tracking-panel" aria-labelledby="morning-weight-title">
             <h2 id="morning-weight-title">Morning weight</h2>
             <form id="weight-form" class="stack-form">
@@ -39,7 +40,10 @@
               <article class="meal-card" data-meal-card data-slot="breakfast" data-status-labels="Not logged Logged Skipped">
                 <header class="meal-card-header">
                   <h3>Breakfast</h3>
-                  <p class="meal-status" data-meal-status="breakfast">Not logged</p>
+                  <p class="meal-status" data-meal-status="breakfast" data-state="notLogged">
+                    <span class="status-marker" data-state="notLogged" aria-hidden="true">○</span>
+                    <span data-status-text>Not logged</span>
+                  </p>
                 </header>
                 <p class="planned-text" data-planned-text="breakfast">No plan entered</p>
                 <p class="note" data-plan-empty-copy="breakfast">This slot can stay blank. Add a plan when it helps.</p>
@@ -65,7 +69,10 @@
               <article class="meal-card" data-meal-card data-slot="lunch" data-status-labels="Not logged Logged Skipped">
                 <header class="meal-card-header">
                   <h3>Lunch</h3>
-                  <p class="meal-status" data-meal-status="lunch">Not logged</p>
+                  <p class="meal-status" data-meal-status="lunch" data-state="notLogged">
+                    <span class="status-marker" data-state="notLogged" aria-hidden="true">○</span>
+                    <span data-status-text>Not logged</span>
+                  </p>
                 </header>
                 <p class="planned-text" data-planned-text="lunch">No plan entered</p>
                 <p class="note" data-plan-empty-copy="lunch">This slot can stay blank. Add a plan when it helps.</p>
@@ -91,7 +98,10 @@
               <article class="meal-card" data-meal-card data-slot="dinner" data-status-labels="Not logged Logged Skipped">
                 <header class="meal-card-header">
                   <h3>Dinner</h3>
-                  <p class="meal-status" data-meal-status="dinner">Not logged</p>
+                  <p class="meal-status" data-meal-status="dinner" data-state="notLogged">
+                    <span class="status-marker" data-state="notLogged" aria-hidden="true">○</span>
+                    <span data-status-text>Not logged</span>
+                  </p>
                 </header>
                 <p class="planned-text" data-planned-text="dinner">No plan entered</p>
                 <p class="note" data-plan-empty-copy="dinner">This slot can stay blank. Add a plan when it helps.</p>
@@ -117,7 +127,10 @@
               <article class="meal-card" data-meal-card data-slot="snack" data-status-labels="Not logged Logged Skipped">
                 <header class="meal-card-header">
                   <h3>Optional Snack</h3>
-                  <p class="meal-status" data-meal-status="snack">Not logged</p>
+                  <p class="meal-status" data-meal-status="snack" data-state="notLogged">
+                    <span class="status-marker" data-state="notLogged" aria-hidden="true">○</span>
+                    <span data-status-text>Not logged</span>
+                  </p>
                 </header>
                 <p class="planned-text" data-planned-text="snack">No plan entered</p>
                 <p class="note" data-plan-empty-copy="snack">This slot can stay blank. Add a plan when it helps.</p>

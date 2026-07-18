@@ -99,6 +99,14 @@ p {
   width: 100%;
 }
 
+.date-heading {
+  margin-bottom: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
 .settings-panel {
   padding: 24px;
   border: 1px solid var(--border);
@@ -166,6 +174,12 @@ p {
   background: var(--surface);
 }
 
+.tracking-panel.is-focal,
+.meal-card.is-focal {
+  border-color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
 .today-meals {
   display: grid;
   gap: 16px;
@@ -201,21 +215,38 @@ p {
   white-space: nowrap;
 }
 
-.meal-status::before {
-  content: "○";
+.status-marker {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
 }
 
-.meal-status[data-state="logged"] {
+.status-marker[data-state="notLogged"] {
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.meal-status[data-state="logged"],
+.status-marker[data-state="logged"] {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.meal-status[data-state="logged"]::before {
-  content: "✓";
+.status-marker[data-state="logged"] {
+  background: var(--accent);
+  color: #FFFFFF;
 }
 
-.meal-status[data-state="skipped"]::before {
-  content: "-";
+.status-marker[data-state="skipped"] {
+  border-radius: 4px;
+  background: var(--surface-secondary);
+  color: var(--text);
 }
 
 .planned-text {

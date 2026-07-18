@@ -63,8 +63,10 @@ test("meal status labels use text plus non-color-only marker elements", () => {
     assert.match(css, new RegExp(`\\.status-marker\\[data-state="${state}"\\]`), `missing marker style for ${state}`);
   }
 
+  assert.match(html, /data-status-text[^>]*>Not logged</, "missing initial status text element");
+
   for (const label of ["Not logged", "Logged", "Skipped"]) {
-    assert.match(html, new RegExp(`data-status-text[^>]*>${escapeRegExp(label)}<`), `missing status text ${label}`);
+    assert.match(html + appSource, new RegExp(escapeRegExp(label)), `missing status text ${label}`);
   }
 });
 

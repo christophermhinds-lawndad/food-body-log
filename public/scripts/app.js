@@ -24,6 +24,7 @@ const settingsMessage = document.querySelector("#settings-message");
 const weightForm = document.querySelector("#weight-form");
 const weightInput = document.querySelector("#weight-value");
 const weightMessage = document.querySelector("#weight-message");
+const todayDate = document.querySelector("#today-date");
 const planForm = document.querySelector("#plan-form");
 const planMessage = document.querySelector("#plan-message");
 let todayDayID = getTodayDayID();
@@ -63,7 +64,7 @@ document.querySelectorAll("[data-meal-form]").forEach((form) => {
 
 document.querySelectorAll("[data-skip-meal]").forEach((button) => {
   button.addEventListener("click", () => {
-    skipSelectedMeal(button.dataset.skipMeal);
+    skipSelectedMeal(button);
   });
 });
 
@@ -193,12 +194,14 @@ async function saveTodayWeight() {
 }
 
 async function saveMealFromForm(form) {
-  const slot = form.dataset.slot;
+  const card = form.closest("[data-meal-card]");
+  const message = mealMessageForCard(card);
+  const slot = card?.dataset.slot || form.dataset.slot;
   const ateWhenHungry = selectedMetricValue(form, `${slot}-hungry`);
   const stoppedAtEnough = selectedMetricValue(form, `${slot}-enough`);
 
   if (!ateWhenHungry || !stoppedAtEnough) {
-    setText(document.querySelector(`[data-meal-message="${slot}"]`), "Choose Yes or No for both answers before saving.");
+    setText(message, "Choose Yes or No for both answers before saving.");
     return;
   }
 
@@ -208,24 +211,29 @@ async function saveMealFromForm(form) {
   });
 
   if (!result.available) {
-    setText(document.querySelector(`[data-meal-message="${slot}"]`), "Meal log could not be saved. Try again.");
+    setText(message, "Meal log could not be saved. Try again.");
     return;
   }
 
-  renderTodayState(result);
-  setText(document.querySelector(`[data-meal-message="${slot}"]`), "Meal log saved.");
+  renderAffectedMeal(result, slot);
+  markTodayFocalState(result);
+  setText(message, "Meal log saved.");
 }
 
-async function skipSelectedMeal(slot) {
+async function skipSelectedMeal(button) {
+  const card = button.closest("[data-meal-card]");
+  const message = mealMessageForCard(card);
+  const slot = card?.dataset.slot || button.dataset.skipMeal;
   const result = await skipMeal(todayDayID, slot);
 
   if (!result.available) {
-    setText(document.querySelector(`[data-meal-message="${slot}"]`), "Meal log could not be saved. Try again.");
+    setText(message, "Meal log could not be saved. Try again.");
     return;
   }
 
-  renderTodayState(result);
-  setText(document.querySelector(`[data-meal-message="${slot}"]`), "Meal marked skipped.");
+  renderAffectedMeal(result, slot);
+  markTodayFocalState(result);
+  setText(message, "Meal marked skipped.");
 }
 
 function renderTodayState(state) {
@@ -235,6 +243,7 @@ function renderTodayState(state) {
   }
 
   todayDayID = state.day.dayID;
+  setText(todayDate, state.day.dayID);
 
   if (weightInput) {
     weightInput.value = state.weight?.value == null ? "" : String(state.weight.value);
@@ -245,6 +254,8 @@ function renderTodayState(state) {
   for (const meal of state.meals) {
     renderMeal(meal);
   }
+
+  markTodayFocalState(state);
 }
 
 function renderMeal(meal) {
@@ -253,19 +264,25 @@ function renderMeal(meal) {
   const statusNode = document.querySelector(`[data-meal-status="${meal.slot}"]`);
   const form = document.querySelector(`[data-meal-form][data-slot="${meal.slot}"]`);
   const submitButton = form?.querySelector("[type='submit']");
+  const metricGroups = form?.querySelectorAll(".metric-group") || [];
 
   setText(plannedTextNode, meal.plannedText || "No plan entered");
   if (planEmptyCopy) {
     planEmptyCopy.hidden = Boolean(meal.plannedText);
   }
 
-  setStatusText(statusNode, mealStatusLabel(meal.logState));
+  renderMealStatus(statusNode, meal.logState);
   setMetricValue(form, `${meal.slot}-hungry`, meal.ateWhenHungry);
   setMetricValue(form, `${meal.slot}-enough`, meal.stoppedAtEnough);
 
   if (submitButton) {
     setText(submitButton, meal.logState === MEAL_STATES.logged ? "Update log" : "Log meal");
+    submitButton.hidden = meal.logState === MEAL_STATES.skipped;
   }
+
+  metricGroups.forEach((group) => {
+    group.hidden = meal.logState === MEAL_STATES.skipped;
+  });
 }
 
 function selectedPlanDayID() {
@@ -284,6 +301,51 @@ function setMetricValue(form, name, value) {
   });
 }
 
+function renderAffectedMeal(state, slot) {
+  const meal = state.meals.find((candidate) => candidate.slot === slot);
+  if (meal) {
+    renderMeal(meal);
+  }
+}
+
+function mealMessageForCard(card) {
+  if (!card) {
+    return null;
+  }
+
+  return card.querySelector("[data-meal-message]");
+}
+
+function markTodayFocalState(state) {
+  document.querySelector(".tracking-panel")?.classList.toggle("is-focal", state.weight?.value == null);
+
+  let focalMealSlot = null;
+  if (state.weight?.value != null) {
+    focalMealSlot = state.meals.find((meal) => meal.logState === MEAL_STATES.notLogged)?.slot || null;
+  }
+
+  document.querySelectorAll("[data-meal-card]").forEach((card) => {
+    card.classList.toggle("is-focal", card.dataset.slot === focalMealSlot);
+  });
+}
+
+function renderMealStatus(statusNode, logState) {
+  const label = mealStatusLabel(logState);
+  const marker = statusNode?.querySelector(".status-marker");
+  const textNode = statusNode?.querySelector("[data-status-text]");
+
+  if (statusNode) {
+    statusNode.dataset.state = logState;
+  }
+
+  if (marker) {
+    marker.dataset.state = logState;
+    setText(marker, mealStatusMarker(logState));
+  }
+
+  setText(textNode, label);
+}
+
 function mealStatusLabel(logState) {
   if (logState === MEAL_STATES.logged) {
     return "Logged";
@@ -294,4 +356,16 @@ function mealStatusLabel(logState) {
   }
 
   return "Not logged";
+}
+
+function mealStatusMarker(logState) {
+  if (logState === MEAL_STATES.logged) {
+    return "✓";
+  }
+
+  if (logState === MEAL_STATES.skipped) {
+    return "-";
+  }
+
+  return "○";
 }
