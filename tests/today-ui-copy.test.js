@@ -1,0 +1,85 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
+const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
+
+const forbiddenVisibleCopy = [
+  "calories",
+  "macros",
+  "food grades",
+  "goal weight",
+  "target weight",
+  "weight-loss advice",
+  "streaks",
+  "perfect days",
+  "failures",
+  "cheating",
+  "good foods",
+  "bad foods",
+  "on track",
+  "off track",
+];
+
+test("today and plan surfaces include the required Phase 2 copy", () => {
+  for (const copy of [
+    "Today",
+    "Morning weight",
+    "Weight is just one data point. It is not a reflection of you.",
+    "Save weight",
+    "Weight saved for today.",
+    "No weight entered today.",
+    "Today's meals",
+    "Plan meals",
+    "Tomorrow",
+    "Today",
+    "Leave any slot blank if you do not want to plan it.",
+    "Save plan",
+    "Plan saved.",
+    "Meal log saved.",
+    "Meal marked skipped.",
+    "Ate when hungry?",
+    "Stopped at enough?",
+    "Yes",
+    "No",
+    "No plan entered",
+    "This slot can stay blank. Add a plan when it helps.",
+  ]) {
+    assert.match(html + appSource, new RegExp(escapeRegExp(copy)), `missing ${copy}`);
+  }
+});
+
+test("plan fields are optional and blank slots do not show warning or error copy", () => {
+  assert.doesNotMatch(html, /data-plan-slot="[^"]+"[^>]*required/);
+  assert.doesNotMatch(html, /required[^>]*data-plan-slot="[^"]+"/);
+  assert.doesNotMatch(html, /blank[^<]*(warning|error|required)/i);
+  assert.doesNotMatch(html, /missing[^<]*(meal|plan|slot)/i);
+});
+
+test("meal status labels use text plus non-color-only marker elements", () => {
+  for (const state of ["notLogged", "logged", "skipped"]) {
+    assert.match(css, new RegExp(`\\.status-marker\\[data-state="${state}"\\]`), `missing marker style for ${state}`);
+  }
+
+  for (const label of ["Not logged", "Logged", "Skipped"]) {
+    assert.match(html, new RegExp(`data-status-text[^>]*>${escapeRegExp(label)}<`), `missing status text ${label}`);
+  }
+});
+
+test("meal save and error rendering is scoped to the affected card", () => {
+  assert.match(appSource, /form\.closest\("\[data-meal-card\]"\)/);
+  assert.match(appSource, /card\.querySelector\("\[data-meal-message\]"\)/);
+  assert.doesNotMatch(appSource, /document\.querySelector\(`\[data-meal-message="\$\{slot\}"\]`\)/);
+});
+
+test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () => {
+  for (const forbidden of forbiddenVisibleCopy) {
+    assert.doesNotMatch(html.toLowerCase(), new RegExp(escapeRegExp(forbidden)), `forbidden visible copy: ${forbidden}`);
+  }
+});
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
