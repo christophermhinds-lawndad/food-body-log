@@ -2,12 +2,15 @@ import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
 import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js";
+import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
+import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js";
+import { getPlanState, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal } from "./today-tracking.js";
 
 const appPaths = createAppPaths();
 
 const titles = {
   today: "Today",
-  plan: "Plan",
+  plan: "Plan meals",
   reports: "Reports",
   journal: "Journal & Breakthroughs",
   history: "History",
@@ -18,6 +21,13 @@ const statusValueNodes = Object.fromEntries(
   Array.from(document.querySelectorAll("[data-status-value]")).map((node) => [node.dataset.statusValue, node]),
 );
 const settingsMessage = document.querySelector("#settings-message");
+const weightForm = document.querySelector("#weight-form");
+const weightInput = document.querySelector("#weight-value");
+const weightMessage = document.querySelector("#weight-message");
+const planForm = document.querySelector("#plan-form");
+const planMessage = document.querySelector("#plan-message");
+let todayDayID = getTodayDayID();
+let planDayID = getTomorrowDayID();
 
 document.querySelectorAll("[data-tab]").forEach((button) => {
   button.addEventListener("click", () => selectTab(button.dataset.tab));
@@ -27,8 +37,40 @@ document.querySelector("#check-install-status")?.addEventListener("click", () =>
   checkInstallStatus();
 });
 
+weightForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveTodayWeight();
+});
+
+planForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveSelectedPlan();
+});
+
+document.querySelectorAll("[name='plan-day']").forEach((control) => {
+  control.addEventListener("change", () => {
+    planDayID = selectedPlanDayID();
+    loadPlanView();
+  });
+});
+
+document.querySelectorAll("[data-meal-form]").forEach((form) => {
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveMealFromForm(form);
+  });
+});
+
+document.querySelectorAll("[data-skip-meal]").forEach((button) => {
+  button.addEventListener("click", () => {
+    skipSelectedMeal(button.dataset.skipMeal);
+  });
+});
+
 registerServiceWorker();
 readStoredStatus();
+loadTodayView();
+loadPlanView();
 
 function selectTab(tabName) {
   document.querySelectorAll("[data-tab]").forEach((button) => {
@@ -40,8 +82,16 @@ function selectTab(tabName) {
   });
 
   const title = titles[tabName] || "Today";
-  document.querySelector("#view-title").textContent = title;
+  setText(document.querySelector("#view-title"), title);
   document.querySelector("#app-content").focus({ preventScroll: true });
+
+  if (tabName === "today") {
+    loadTodayView();
+  }
+
+  if (tabName === "plan") {
+    loadPlanView();
+  }
 }
 
 async function registerServiceWorker() {
@@ -85,4 +135,163 @@ async function checkInstallStatus() {
 
   renderStatusRows(status.rows, statusValueNodes);
   setText(settingsMessage, status.message);
+}
+
+async function loadTodayView() {
+  setText(weightMessage, "Loading today's entries...");
+  const state = await getTodayTrackingState();
+  renderTodayState(state);
+}
+
+async function loadPlanView() {
+  setText(planMessage, "Loading plan...");
+  const state = await getPlanState(planDayID);
+
+  if (!state.available) {
+    setText(planMessage, "Plan could not be loaded. Try again.");
+    return;
+  }
+
+  for (const meal of state.meals) {
+    const input = document.querySelector(`[data-plan-slot="${meal.slot}"]`);
+    if (input) {
+      input.value = meal.plannedText || "";
+    }
+  }
+
+  setText(planMessage, "");
+}
+
+async function saveSelectedPlan() {
+  const plannedTextBySlot = Object.fromEntries(
+    Array.from(document.querySelectorAll("[data-plan-slot]")).map((input) => [input.dataset.planSlot, input.value]),
+  );
+  const result = await savePlan(planDayID, plannedTextBySlot);
+
+  if (!result.available) {
+    setText(planMessage, "Plan could not be saved. Try again.");
+    return;
+  }
+
+  setText(planMessage, "Plan saved.");
+
+  if (planDayID === todayDayID) {
+    renderTodayState(result);
+  }
+}
+
+async function saveTodayWeight() {
+  const result = await saveWeight(todayDayID, weightInput?.value || "");
+
+  if (!result.available) {
+    setText(weightMessage, result.status === "Invalid" ? "Enter a positive weight value before saving." : "Weight could not be saved. Try again.");
+    return;
+  }
+
+  renderTodayState(result);
+  setText(weightMessage, "Weight saved for today.");
+}
+
+async function saveMealFromForm(form) {
+  const slot = form.dataset.slot;
+  const ateWhenHungry = selectedMetricValue(form, `${slot}-hungry`);
+  const stoppedAtEnough = selectedMetricValue(form, `${slot}-enough`);
+
+  if (!ateWhenHungry || !stoppedAtEnough) {
+    setText(document.querySelector(`[data-meal-message="${slot}"]`), "Choose Yes or No for both answers before saving.");
+    return;
+  }
+
+  const result = await saveMealLog(todayDayID, slot, {
+    ateWhenHungry,
+    stoppedAtEnough,
+  });
+
+  if (!result.available) {
+    setText(document.querySelector(`[data-meal-message="${slot}"]`), "Meal log could not be saved. Try again.");
+    return;
+  }
+
+  renderTodayState(result);
+  setText(document.querySelector(`[data-meal-message="${slot}"]`), "Meal log saved.");
+}
+
+async function skipSelectedMeal(slot) {
+  const result = await skipMeal(todayDayID, slot);
+
+  if (!result.available) {
+    setText(document.querySelector(`[data-meal-message="${slot}"]`), "Meal log could not be saved. Try again.");
+    return;
+  }
+
+  renderTodayState(result);
+  setText(document.querySelector(`[data-meal-message="${slot}"]`), "Meal marked skipped.");
+}
+
+function renderTodayState(state) {
+  if (!state.available) {
+    setText(weightMessage, "Today's entries could not be loaded. Reopen the app and try again. Data already saved on this device stays local.");
+    return;
+  }
+
+  todayDayID = state.day.dayID;
+
+  if (weightInput) {
+    weightInput.value = state.weight?.value == null ? "" : String(state.weight.value);
+  }
+
+  setText(weightMessage, state.weight?.value == null ? "No weight entered today." : "Weight saved for today.");
+
+  for (const meal of state.meals) {
+    renderMeal(meal);
+  }
+}
+
+function renderMeal(meal) {
+  const plannedTextNode = document.querySelector(`[data-planned-text="${meal.slot}"]`);
+  const planEmptyCopy = document.querySelector(`[data-plan-empty-copy="${meal.slot}"]`);
+  const statusNode = document.querySelector(`[data-meal-status="${meal.slot}"]`);
+  const form = document.querySelector(`[data-meal-form][data-slot="${meal.slot}"]`);
+  const submitButton = form?.querySelector("[type='submit']");
+
+  setText(plannedTextNode, meal.plannedText || "No plan entered");
+  if (planEmptyCopy) {
+    planEmptyCopy.hidden = Boolean(meal.plannedText);
+  }
+
+  setStatusText(statusNode, mealStatusLabel(meal.logState));
+  setMetricValue(form, `${meal.slot}-hungry`, meal.ateWhenHungry);
+  setMetricValue(form, `${meal.slot}-enough`, meal.stoppedAtEnough);
+
+  if (submitButton) {
+    setText(submitButton, meal.logState === MEAL_STATES.logged ? "Update log" : "Log meal");
+  }
+}
+
+function selectedPlanDayID() {
+  const selected = document.querySelector("[name='plan-day']:checked")?.value;
+  return selected === "today" ? getTodayDayID() : getTomorrowDayID();
+}
+
+function selectedMetricValue(form, name) {
+  const value = form?.querySelector(`[name="${name}"]:checked`)?.value;
+  return value === MEAL_ANSWERS.yes || value === MEAL_ANSWERS.no ? value : null;
+}
+
+function setMetricValue(form, name, value) {
+  form?.querySelectorAll(`[name="${name}"]`).forEach((input) => {
+    input.checked = input.value === value;
+  });
+}
+
+function mealStatusLabel(logState) {
+  if (logState === MEAL_STATES.logged) {
+    return "Logged";
+  }
+
+  if (logState === MEAL_STATES.skipped) {
+    return "Skipped";
+  }
+
+  return "Not logged";
 }

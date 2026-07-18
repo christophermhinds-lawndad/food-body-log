@@ -1,6 +1,9 @@
 const DB_NAME = "food-body-log";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const SETTINGS_STORE = "settings";
+const DAYS_STORE = "days";
+const MEALS_STORE = "meals";
+const WEIGHTS_STORE = "weights";
 const SETUP_STATUS_KEY = "setup-status";
 const UNAVAILABLE = Object.freeze({
   available: false,
@@ -21,6 +24,20 @@ export function openAppDb() {
 
       if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
         db.createObjectStore(SETTINGS_STORE, { keyPath: "key" });
+      }
+
+      if (!db.objectStoreNames.contains(DAYS_STORE)) {
+        db.createObjectStore(DAYS_STORE, { keyPath: "dayID" });
+      }
+
+      if (!db.objectStoreNames.contains(MEALS_STORE)) {
+        const mealsStore = db.createObjectStore(MEALS_STORE, { keyPath: "id" });
+        mealsStore.createIndex("byDay", "dayID", { unique: false });
+        mealsStore.createIndex("byDaySlot", ["dayID", "slot"], { unique: true });
+      }
+
+      if (!db.objectStoreNames.contains(WEIGHTS_STORE)) {
+        db.createObjectStore(WEIGHTS_STORE, { keyPath: "dayID" });
       }
     };
 

@@ -21,14 +21,148 @@
       </header>
 
       <main id="app-content" class="app-main" tabindex="-1">
-        <section class="view-panel" data-view="today">
-          <h2>Your app shell is ready</h2>
-          <p>Today tracking arrives in the next phase. For now, use Settings to confirm install, offline cache, and local storage status.</p>
+        <section class="view-panel today-view" data-view="today">
+          <section class="tracking-panel" aria-labelledby="morning-weight-title">
+            <h2 id="morning-weight-title">Morning weight</h2>
+            <form id="weight-form" class="stack-form">
+              <label class="field-label" for="weight-value">Today's weight</label>
+              <input id="weight-value" class="text-field" name="weight" type="number" inputmode="decimal" step="0.1" min="0">
+              <p class="note">Weight is just one data point. It is not a reflection of you.</p>
+              <button class="primary-action compact-action" type="submit">Save weight</button>
+              <p id="weight-message" class="status-message" aria-live="polite">No weight entered today.</p>
+            </form>
+          </section>
+
+          <section class="today-meals" aria-labelledby="today-meals-title">
+            <h2 id="today-meals-title">Today's meals</h2>
+            <div id="today-meal-list" class="meal-list" aria-live="polite">
+              <article class="meal-card" data-meal-card data-slot="breakfast" data-status-labels="Not logged Logged Skipped">
+                <header class="meal-card-header">
+                  <h3>Breakfast</h3>
+                  <p class="meal-status" data-meal-status="breakfast">Not logged</p>
+                </header>
+                <p class="planned-text" data-planned-text="breakfast">No plan entered</p>
+                <p class="note" data-plan-empty-copy="breakfast">This slot can stay blank. Add a plan when it helps.</p>
+                <form class="meal-log-form" data-meal-form data-slot="breakfast">
+                  <fieldset class="metric-group">
+                    <legend>Ate when hungry?</legend>
+                    <label><input type="radio" name="breakfast-hungry" value="yes"> Yes</label>
+                    <label><input type="radio" name="breakfast-hungry" value="no"> No</label>
+                  </fieldset>
+                  <fieldset class="metric-group">
+                    <legend>Stopped at enough?</legend>
+                    <label><input type="radio" name="breakfast-enough" value="yes"> Yes</label>
+                    <label><input type="radio" name="breakfast-enough" value="no"> No</label>
+                  </fieldset>
+                  <div class="button-row">
+                    <button class="primary-action compact-action" type="submit">Log meal</button>
+                    <button class="secondary-action" type="button" data-skip-meal="breakfast">Skip meal</button>
+                  </div>
+                  <p class="status-message" data-meal-message="breakfast" aria-live="polite"></p>
+                </form>
+              </article>
+
+              <article class="meal-card" data-meal-card data-slot="lunch" data-status-labels="Not logged Logged Skipped">
+                <header class="meal-card-header">
+                  <h3>Lunch</h3>
+                  <p class="meal-status" data-meal-status="lunch">Not logged</p>
+                </header>
+                <p class="planned-text" data-planned-text="lunch">No plan entered</p>
+                <p class="note" data-plan-empty-copy="lunch">This slot can stay blank. Add a plan when it helps.</p>
+                <form class="meal-log-form" data-meal-form data-slot="lunch">
+                  <fieldset class="metric-group">
+                    <legend>Ate when hungry?</legend>
+                    <label><input type="radio" name="lunch-hungry" value="yes"> Yes</label>
+                    <label><input type="radio" name="lunch-hungry" value="no"> No</label>
+                  </fieldset>
+                  <fieldset class="metric-group">
+                    <legend>Stopped at enough?</legend>
+                    <label><input type="radio" name="lunch-enough" value="yes"> Yes</label>
+                    <label><input type="radio" name="lunch-enough" value="no"> No</label>
+                  </fieldset>
+                  <div class="button-row">
+                    <button class="primary-action compact-action" type="submit">Log meal</button>
+                    <button class="secondary-action" type="button" data-skip-meal="lunch">Skip meal</button>
+                  </div>
+                  <p class="status-message" data-meal-message="lunch" aria-live="polite"></p>
+                </form>
+              </article>
+
+              <article class="meal-card" data-meal-card data-slot="dinner" data-status-labels="Not logged Logged Skipped">
+                <header class="meal-card-header">
+                  <h3>Dinner</h3>
+                  <p class="meal-status" data-meal-status="dinner">Not logged</p>
+                </header>
+                <p class="planned-text" data-planned-text="dinner">No plan entered</p>
+                <p class="note" data-plan-empty-copy="dinner">This slot can stay blank. Add a plan when it helps.</p>
+                <form class="meal-log-form" data-meal-form data-slot="dinner">
+                  <fieldset class="metric-group">
+                    <legend>Ate when hungry?</legend>
+                    <label><input type="radio" name="dinner-hungry" value="yes"> Yes</label>
+                    <label><input type="radio" name="dinner-hungry" value="no"> No</label>
+                  </fieldset>
+                  <fieldset class="metric-group">
+                    <legend>Stopped at enough?</legend>
+                    <label><input type="radio" name="dinner-enough" value="yes"> Yes</label>
+                    <label><input type="radio" name="dinner-enough" value="no"> No</label>
+                  </fieldset>
+                  <div class="button-row">
+                    <button class="primary-action compact-action" type="submit">Log meal</button>
+                    <button class="secondary-action" type="button" data-skip-meal="dinner">Skip meal</button>
+                  </div>
+                  <p class="status-message" data-meal-message="dinner" aria-live="polite"></p>
+                </form>
+              </article>
+
+              <article class="meal-card" data-meal-card data-slot="snack" data-status-labels="Not logged Logged Skipped">
+                <header class="meal-card-header">
+                  <h3>Optional Snack</h3>
+                  <p class="meal-status" data-meal-status="snack">Not logged</p>
+                </header>
+                <p class="planned-text" data-planned-text="snack">No plan entered</p>
+                <p class="note" data-plan-empty-copy="snack">This slot can stay blank. Add a plan when it helps.</p>
+                <form class="meal-log-form" data-meal-form data-slot="snack">
+                  <fieldset class="metric-group">
+                    <legend>Ate when hungry?</legend>
+                    <label><input type="radio" name="snack-hungry" value="yes"> Yes</label>
+                    <label><input type="radio" name="snack-hungry" value="no"> No</label>
+                  </fieldset>
+                  <fieldset class="metric-group">
+                    <legend>Stopped at enough?</legend>
+                    <label><input type="radio" name="snack-enough" value="yes"> Yes</label>
+                    <label><input type="radio" name="snack-enough" value="no"> No</label>
+                  </fieldset>
+                  <div class="button-row">
+                    <button class="primary-action compact-action" type="submit">Log meal</button>
+                    <button class="secondary-action" type="button" data-skip-meal="snack">Skip meal</button>
+                  </div>
+                  <p class="status-message" data-meal-message="snack" aria-live="polite"></p>
+                </form>
+              </article>
+            </div>
+          </section>
         </section>
 
-        <section class="view-panel" data-view="plan" hidden>
-          <h2>Plan</h2>
-          <p>Meal planning arrives in the next phase.</p>
+        <section class="view-panel plan-view" data-view="plan" hidden>
+          <h2>Plan meals</h2>
+          <p class="note">Leave any slot blank if you do not want to plan it.</p>
+          <fieldset class="segmented-control" id="plan-day-control">
+            <legend>Plan day</legend>
+            <label><input type="radio" name="plan-day" value="tomorrow" checked> Tomorrow</label>
+            <label><input type="radio" name="plan-day" value="today"> Today</label>
+          </fieldset>
+          <form id="plan-form" class="stack-form">
+            <label class="field-label" for="plan-breakfast">Breakfast</label>
+            <input id="plan-breakfast" class="text-field" type="text" autocomplete="off" data-plan-slot="breakfast">
+            <label class="field-label" for="plan-lunch">Lunch</label>
+            <input id="plan-lunch" class="text-field" type="text" autocomplete="off" data-plan-slot="lunch">
+            <label class="field-label" for="plan-dinner">Dinner</label>
+            <input id="plan-dinner" class="text-field" type="text" autocomplete="off" data-plan-slot="dinner">
+            <label class="field-label" for="plan-snack">Optional Snack</label>
+            <input id="plan-snack" class="text-field" type="text" autocomplete="off" data-plan-slot="snack">
+            <button class="primary-action compact-action" type="submit">Save plan</button>
+            <p id="plan-message" class="status-message" aria-live="polite"></p>
+          </form>
         </section>
 
         <section class="view-panel" data-view="reports" hidden>
