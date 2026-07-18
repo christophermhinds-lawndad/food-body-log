@@ -41,6 +41,8 @@ test("today and plan surfaces include the required Phase 2 copy", () => {
     "Plan saved.",
     "Meal log saved.",
     "Meal marked skipped.",
+    "Undo skip",
+    "Meal skip undone.",
     "Ate when hungry?",
     "Stopped at enough?",
     "Yes",
@@ -77,6 +79,23 @@ test("meal save and error rendering is scoped to the affected card", () => {
   assert.doesNotMatch(appSource, /document\.querySelector\(`\[data-meal-message="\$\{slot\}"\]`\)/);
 });
 
+test("skipped meals expose a reversible undo action", () => {
+  for (const slot of ["breakfast", "lunch", "dinner", "snack"]) {
+    assert.match(html, new RegExp(`data-unskip-meal="${slot}" hidden`), `missing hidden undo button for ${slot}`);
+  }
+
+  assert.match(appSource, /unskipMeal/);
+  assert.match(appSource, /async function unskipSelectedMeal\(button\)/);
+  assert.match(appSource, /document\.querySelectorAll\("\[data-unskip-meal\]"\)/);
+  assert.match(appSource, /unskipMeal\(todayDayID, slot\)/);
+  assert.match(appSource, /setText\(message, "Meal skip undone\."\)/);
+  assert.match(appSource, /const skipButton = form\?\.querySelector\("\[data-skip-meal\]"\)/);
+  assert.match(appSource, /const unskipButton = form\?\.querySelector\("\[data-unskip-meal\]"\)/);
+  assert.match(appSource, /skipButton\.hidden = meal\.logState === MEAL_STATES\.skipped/);
+  assert.match(appSource, /unskipButton\.hidden = meal\.logState !== MEAL_STATES\.skipped/);
+  assert.match(css, /\.button-row:has\(\[data-unskip-meal\]:not\(\[hidden\]\)\)/);
+});
+
 test("save success paths require Ready status and guard stale plan days", () => {
   assert.match(appSource, /function isReadyResult\(result\)/);
   assert.match(appSource, /result\?\.available === true && result\.status === "Ready"/);
@@ -98,6 +117,7 @@ test("today and plan storage paths refresh local day IDs before use", () => {
   assert.match(appSource, /async function saveTodayWeight\(\) \{\n\s+refreshCurrentDayIDs\(\);/);
   assert.match(appSource, /async function saveMealFromForm\(form\) \{\n\s+refreshCurrentDayIDs\(\);/);
   assert.match(appSource, /async function skipSelectedMeal\(button\) \{\n\s+refreshCurrentDayIDs\(\);/);
+  assert.match(appSource, /async function unskipSelectedMeal\(button\) \{\n\s+refreshCurrentDayIDs\(\);/);
 });
 
 test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () => {

@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
     <link rel="stylesheet" href="./styles/app.css">
-    <script type="module" src="./scripts/app.js"></script>
+    <script type="module" src="./scripts/app.js?v=3"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -61,6 +61,7 @@
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
                     <button class="secondary-action" type="button" data-skip-meal="breakfast">Skip meal</button>
+                    <button class="secondary-action" type="button" data-unskip-meal="breakfast" hidden>Undo skip</button>
                   </div>
                   <p class="status-message" data-meal-message="breakfast" aria-live="polite"></p>
                 </form>
@@ -90,6 +91,7 @@
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
                     <button class="secondary-action" type="button" data-skip-meal="lunch">Skip meal</button>
+                    <button class="secondary-action" type="button" data-unskip-meal="lunch" hidden>Undo skip</button>
                   </div>
                   <p class="status-message" data-meal-message="lunch" aria-live="polite"></p>
                 </form>
@@ -119,6 +121,7 @@
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
                     <button class="secondary-action" type="button" data-skip-meal="dinner">Skip meal</button>
+                    <button class="secondary-action" type="button" data-unskip-meal="dinner" hidden>Undo skip</button>
                   </div>
                   <p class="status-message" data-meal-message="dinner" aria-live="polite"></p>
                 </form>
@@ -148,6 +151,7 @@
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
                     <button class="secondary-action" type="button" data-skip-meal="snack">Skip meal</button>
+                    <button class="secondary-action" type="button" data-unskip-meal="snack" hidden>Undo skip</button>
                   </div>
                   <p class="status-message" data-meal-message="snack" aria-live="polite"></p>
                 </form>

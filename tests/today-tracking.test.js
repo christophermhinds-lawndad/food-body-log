@@ -238,6 +238,12 @@ test("tracking model keeps fixed slots and state values distinct", async () => {
   assert.equal(skippedMeal.logState, model.MEAL_STATES.skipped);
   assert.equal(skippedMeal.ateWhenHungry, model.MEAL_ANSWERS.unanswered);
   assert.equal(skippedMeal.stoppedAtEnough, model.MEAL_ANSWERS.unanswered);
+
+  const unskippedMeal = model.applyUnskippedMeal(skippedMeal, FIXED_NOW);
+  assert.equal(unskippedMeal.logState, model.MEAL_STATES.notLogged);
+  assert.equal(unskippedMeal.ateWhenHungry, model.MEAL_ANSWERS.unanswered);
+  assert.equal(unskippedMeal.stoppedAtEnough, model.MEAL_ANSWERS.unanswered);
+  assert.equal(unskippedMeal.loggedAt, null);
 });
 
 test("repository ensures four slots and preserves blank planned text", async () => {
@@ -469,4 +475,32 @@ test("skipped meals and daily weight upserts stay distinct", async () => {
   assert.equal(snack.ateWhenHungry, model.MEAL_ANSWERS.unanswered);
   assert.equal(snack.stoppedAtEnough, model.MEAL_ANSWERS.unanswered);
   assert.equal(todayState.weight.value, 184.2);
+});
+
+test("undoing a skipped meal restores normal unanswered logging state", async () => {
+  const { model, repository } = await loadTrackingModules("undo-skip");
+
+  await repository.savePlan(TODAY_ID, {
+    breakfast: "Oatmeal",
+    lunch: "Rice bowl",
+    dinner: "",
+    snack: "",
+  });
+  await repository.skipMeal(TODAY_ID, "breakfast", { now: FIXED_NOW });
+
+  const undoResult = await repository.unskipMeal(TODAY_ID, "breakfast", {
+    now: new Date(2026, 6, 18, 8, 45, 0),
+  });
+  const todayState = await repository.getTodayTrackingState({ now: FIXED_NOW });
+  const meals = Object.fromEntries(todayState.meals.map((meal) => [meal.slot, meal]));
+
+  assert.equal(undoResult.available, true);
+  assert.equal(undoResult.status, "Ready");
+  assert.equal(meals.breakfast.plannedText, "Oatmeal");
+  assert.equal(meals.breakfast.logState, model.MEAL_STATES.notLogged);
+  assert.equal(meals.breakfast.ateWhenHungry, model.MEAL_ANSWERS.unanswered);
+  assert.equal(meals.breakfast.stoppedAtEnough, model.MEAL_ANSWERS.unanswered);
+  assert.equal(meals.breakfast.loggedAt, null);
+  assert.equal(meals.lunch.plannedText, "Rice bowl");
+  assert.equal(meals.lunch.logState, model.MEAL_STATES.notLogged);
 });

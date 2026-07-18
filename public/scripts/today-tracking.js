@@ -3,12 +3,13 @@ import {
   MEAL_SLOTS,
   applyLoggedMeal,
   applySkippedMeal,
+  applyUnskippedMeal,
   createDefaultMeal,
   getSlot,
   mealID,
   normalizePlannedText,
   normalizeWeightValue,
-} from "./tracking-model.js";
+} from "./tracking-model.js?v=3";
 import { openAppDb } from "./storage.js";
 
 const DAYS_STORE = "days";
@@ -133,6 +134,25 @@ export async function skipMeal(dayID, slot, options = {}) {
     const existingMeal = await getMeal(db, dayID, selectedSlot.id);
     const skippedMeal = applySkippedMeal(existingMeal, options.now || new Date());
     await putRecord(db, MEALS_STORE, skippedMeal);
+
+    return {
+      status: "Ready",
+      day,
+      meals: await ensureMealsForDay(db, dayID, options),
+      weight: await getWeight(db, dayID),
+    };
+  });
+}
+
+export async function unskipMeal(dayID, slot, options = {}) {
+  return withDb(async (db) => {
+    const selectedSlot = getSlot(slot);
+    const day = await ensureDay(db, dayID, options);
+    await ensureMealsForDay(db, dayID, options);
+
+    const existingMeal = await getMeal(db, dayID, selectedSlot.id);
+    const unskippedMeal = applyUnskippedMeal(existingMeal, options.now || new Date());
+    await putRecord(db, MEALS_STORE, unskippedMeal);
 
     return {
       status: "Ready",

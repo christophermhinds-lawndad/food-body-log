@@ -327,6 +327,10 @@ p {
   gap: 8px;
 }
 
+.button-row:has([data-unskip-meal]:not([hidden])) {
+  grid-template-columns: 1fr;
+}
+
 .status-list {
   display: grid;
   gap: 16px;

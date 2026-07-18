@@ -1,10 +1,10 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js";
+import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=3";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
-import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js";
-import { getPlanState, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal } from "./today-tracking.js";
+import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
+import { getPlanState, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=3";
 
 const appPaths = createAppPaths();
 
@@ -65,6 +65,12 @@ document.querySelectorAll("[data-meal-form]").forEach((form) => {
 document.querySelectorAll("[data-skip-meal]").forEach((button) => {
   button.addEventListener("click", () => {
     skipSelectedMeal(button);
+  });
+});
+
+document.querySelectorAll("[data-unskip-meal]").forEach((button) => {
+  button.addEventListener("click", () => {
+    unskipSelectedMeal(button);
   });
 });
 
@@ -264,6 +270,23 @@ async function skipSelectedMeal(button) {
   setText(message, "Meal marked skipped.");
 }
 
+async function unskipSelectedMeal(button) {
+  refreshCurrentDayIDs();
+  const card = button.closest("[data-meal-card]");
+  const message = mealMessageForCard(card);
+  const slot = card?.dataset.slot || button.dataset.unskipMeal;
+  const result = await unskipMeal(todayDayID, slot);
+
+  if (!isReadyResult(result)) {
+    setText(message, "Meal log could not be saved. Try again.");
+    return;
+  }
+
+  renderAffectedMeal(result, slot);
+  markTodayFocalState(result);
+  setText(message, "Meal skip undone.");
+}
+
 function renderTodayState(state) {
   if (!state.available) {
     setText(weightMessage, "Today's entries could not be loaded. Reopen the app and try again. Data already saved on this device stays local.");
@@ -292,6 +315,8 @@ function renderMeal(meal) {
   const statusNode = document.querySelector(`[data-meal-status="${meal.slot}"]`);
   const form = document.querySelector(`[data-meal-form][data-slot="${meal.slot}"]`);
   const submitButton = form?.querySelector("[type='submit']");
+  const skipButton = form?.querySelector("[data-skip-meal]");
+  const unskipButton = form?.querySelector("[data-unskip-meal]");
   const metricGroups = form?.querySelectorAll(".metric-group") || [];
 
   setText(plannedTextNode, meal.plannedText || "No plan entered");
@@ -306,6 +331,14 @@ function renderMeal(meal) {
   if (submitButton) {
     setText(submitButton, meal.logState === MEAL_STATES.logged ? "Update log" : "Log meal");
     submitButton.hidden = meal.logState === MEAL_STATES.skipped;
+  }
+
+  if (skipButton) {
+    skipButton.hidden = meal.logState === MEAL_STATES.skipped;
+  }
+
+  if (unskipButton) {
+    unskipButton.hidden = meal.logState !== MEAL_STATES.skipped;
   }
 
   metricGroups.forEach((group) => {

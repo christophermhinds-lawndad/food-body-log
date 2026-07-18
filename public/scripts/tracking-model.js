@@ -49,6 +49,19 @@ export function applySkippedMeal(existingMeal, now = new Date()) {
   };
 }
 
+export function applyUnskippedMeal(existingMeal, now = new Date()) {
+  const nowIso = toIso(now);
+
+  return {
+    ...existingMeal,
+    logState: MEAL_STATES.notLogged,
+    ateWhenHungry: MEAL_ANSWERS.unanswered,
+    stoppedAtEnough: MEAL_ANSWERS.unanswered,
+    loggedAt: null,
+    updatedAt: nowIso,
+  };
+}
+
 export function applyLoggedMeal(existingMeal, options = {}) {
   const ateWhenHungry = normalizeAnswer(options.ateWhenHungry);
   const stoppedAtEnough = normalizeAnswer(options.stoppedAtEnough);
