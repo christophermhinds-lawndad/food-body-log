@@ -5,6 +5,7 @@ import test from "node:test";
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
+const phaseUat = await readFile(new URL("../.planning/phases/02-today-tracking-loop/02-UAT.md", import.meta.url), "utf8");
 
 const forbiddenVisibleCopy = [
   "calories",
@@ -79,6 +80,30 @@ test("meal save and error rendering is scoped to the affected card", () => {
 test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () => {
   for (const forbidden of forbiddenVisibleCopy) {
     assert.doesNotMatch(html.toLowerCase(), new RegExp(escapeRegExp(forbidden)), `forbidden visible copy: ${forbidden}`);
+  }
+});
+
+test("phase 2 UAT records manual timing and target-device checks without claiming pass", () => {
+  for (const required of [
+    "Localhost meal logging timing",
+    "under 60 seconds",
+    "390px layout and status contrast",
+    "iPhone 13 Home Screen standalone framing",
+    "Hosted launch and offline relaunch",
+    "Phase 1 target-device boundary carried forward",
+    "human-needed",
+    "physical-device",
+  ]) {
+    assert.match(phaseUat, new RegExp(escapeRegExp(required)), `missing UAT item: ${required}`);
+  }
+
+  assert.doesNotMatch(phaseUat, /passed:\s*[1-9]/i);
+  assert.doesNotMatch(phaseUat, /result:\s*pass/i);
+});
+
+test("phase 2 UAT avoids forbidden diet, scoring, advice, and setup language", () => {
+  for (const forbidden of [...forbiddenVisibleCopy, "package setup", "database service", "account setup"]) {
+    assert.doesNotMatch(phaseUat.toLowerCase(), new RegExp(escapeRegExp(forbidden)), `forbidden UAT copy: ${forbidden}`);
   }
 });
 
