@@ -1,4 +1,4 @@
-export const CACHE_NAME = "food-body-log-shell-v4";
+export const CACHE_NAME = "food-body-log-shell-v5";
 export const APP_SHELL = [
   "./",
   "./index.html",
@@ -12,6 +12,8 @@ export const APP_SHELL = [
   "./scripts/today-tracking.js?v=3",
   "./scripts/install-status.js?v=4",
   "./scripts/plan-suggestions-ui.js?v=4",
+  "./scripts/journal-model.js?v=1",
+  "./scripts/journal-tracking.js?v=1",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
