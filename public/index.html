@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#FAFAF8">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Food Body Log">
+    <title>Food Body Log</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+    <link rel="stylesheet" href="./styles/app.css">
+    <script type="module" src="./scripts/app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <p class="eyebrow">Local-first app shell</p>
+        <h1 id="view-title">Today</h1>
+      </header>
+
+      <main id="app-content" class="app-main" tabindex="-1">
+        <section class="view-panel" data-view="today">
+          <h2>Your app shell is ready</h2>
+          <p>Today tracking arrives in the next phase. For now, use Settings to confirm install, offline cache, and local storage status.</p>
+        </section>
+
+        <section class="view-panel" data-view="plan" hidden>
+          <h2>Plan</h2>
+          <p>Meal planning arrives in the next phase.</p>
+        </section>
+
+        <section class="view-panel" data-view="reports" hidden>
+          <h2>Reports</h2>
+          <p>Numeric summaries arrive after daily entries exist.</p>
+        </section>
+
+        <section class="view-panel" data-view="journal" hidden>
+          <h2>Journal &amp; Breakthroughs</h2>
+          <p>Evening reflection arrives after the daily tracking loop.</p>
+        </section>
+
+        <section class="view-panel" data-view="history" hidden>
+          <h2>History</h2>
+          <p>Prior day review arrives after local daily records exist.</p>
+        </section>
+
+        <section class="view-panel settings-panel" data-view="settings" hidden>
+          <h2>Install status</h2>
+          <p>Your data stays on this device. Food, body, and journal data are not synced to an account.</p>
+
+          <button id="check-install-status" class="primary-action" type="button">Check install status</button>
+
+          <dl class="status-list" aria-live="polite">
+            <div class="status-row">
+              <dt>Install mode</dt>
+              <dd id="install-mode-status">Not ready</dd>
+            </div>
+            <div class="status-row">
+              <dt>Offline app shell</dt>
+              <dd id="offline-cache-status">Not ready</dd>
+            </div>
+            <div class="status-row">
+              <dt>Local storage</dt>
+              <dd id="local-storage-status">Not ready</dd>
+            </div>
+          </dl>
+
+          <p id="settings-message" class="status-message">Open this app while online once more, then check again.</p>
+          <p class="note">Updates may require revisiting the app URL after new static files are published.</p>
+          <p class="note">Browser storage can be cleared by deleting the app or website data. Export/import arrives in a later phase.</p>
+        </section>
+      </main>
+
+      <nav class="tab-bar" aria-label="Primary">
+        <button class="tab-button" type="button" data-tab="today" aria-controls="app-content" aria-selected="true">
+          <span aria-hidden="true" class="tab-dot"></span>
+          <span>Today</span>
+        </button>
+        <button class="tab-button" type="button" data-tab="plan" aria-controls="app-content" aria-selected="false">
+          <span aria-hidden="true" class="tab-dot"></span>
+          <span>Plan</span>
+        </button>
+        <button class="tab-button" type="button" data-tab="reports" aria-controls="app-content" aria-selected="false">
+          <span aria-hidden="true" class="tab-dot"></span>
+          <span>Reports</span>
+        </button>
+        <button class="tab-button" type="button" data-tab="journal" aria-controls="app-content" aria-selected="false">
+          <span aria-hidden="true" class="tab-dot"></span>
+          <span>Journal</span>
+        </button>
+        <button class="tab-button" type="button" data-tab="history" aria-controls="app-content" aria-selected="false">
+          <span aria-hidden="true" class="tab-dot"></span>
+          <span>History</span>
+        </button>
+        <button class="tab-button" type="button" data-tab="settings" aria-controls="app-content" aria-selected="false">
+          <span aria-hidden="true" class="tab-dot"></span>
+          <span>Settings</span>
+        </button>
+      </nav>
+    </div>
+  </body>
+</html>
