@@ -2,49 +2,73 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 class FakeObjectStore {
-  constructor(records) {
-    this.records = records;
+  constructor(store) {
+    this.store = store;
+    this.records = store.records;
+  }
+
+  createIndex(name, keyPath, options) {
+    this.store.indexes.set(name, { keyPath, options });
+    return { name, keyPath, options };
   }
 
   put(value) {
-    this.records.set(value.key, structuredClone(value));
-    return requestThatSucceeds(value.key);
+    const key = value[this.store.keyPath];
+    this.records.set(key, structuredClone(value));
+    return requestThatSucceeds(key);
   }
 
   get(key) {
     return requestThatSucceeds(this.records.get(key));
   }
+
+  count() {
+    return requestThatSucceeds(this.records.size);
+  }
+}
+
+class FakeStoreState {
+  constructor(keyPath) {
+    this.keyPath = keyPath;
+    this.records = new Map();
+    this.indexes = new Map();
+  }
 }
 
 class FakeTransaction {
-  constructor(records) {
-    this.records = records;
+  constructor(stores) {
+    this.stores = stores;
   }
 
-  objectStore() {
-    return new FakeObjectStore(this.records);
+  objectStore(name) {
+    const store = this.stores.get(name);
+
+    assert.ok(store, `missing object store ${name}`);
+    return new FakeObjectStore(store);
   }
 }
 
 class FakeDb {
   constructor() {
-    this.records = new Map();
+    this.stores = new Map();
     this.objectStoreNames = {
-      contains: (name) => name === "settings" && this.hasSettingsStore,
+      contains: (name) => this.stores.has(name),
     };
-    this.hasSettingsStore = false;
   }
 
   createObjectStore(name, options) {
-    assert.equal(name, "settings");
-    assert.deepEqual(options, { keyPath: "key" });
-    this.hasSettingsStore = true;
+    assert.ok(options?.keyPath, `${name} store needs a keyPath`);
+    const store = new FakeStoreState(options.keyPath);
+    this.stores.set(name, store);
+    return new FakeObjectStore(store);
   }
 
-  transaction(name, mode) {
-    assert.equal(name, "settings");
+  transaction(names, mode) {
+    for (const name of Array.isArray(names) ? names : [names]) {
+      assert.ok(this.stores.has(name), `transaction requested missing store ${name}`);
+    }
     assert.match(mode, /readonly|readwrite/);
-    return new FakeTransaction(this.records);
+    return new FakeTransaction(this.stores);
   }
 
   close() {}
@@ -62,7 +86,7 @@ function installFakeIndexedDb() {
   globalThis.indexedDB = {
     open(name, version) {
       assert.equal(name, "food-body-log");
-      assert.equal(version, 1);
+      assert.equal(version, 2);
 
       const request = { result: db, error: null };
       queueMicrotask(() => {
@@ -72,10 +96,12 @@ function installFakeIndexedDb() {
       return request;
     },
   };
+
+  return db;
 }
 
-test("storage adapter opens version 1 settings store and writes/reads setup status", async () => {
-  installFakeIndexedDb();
+test("storage adapter opens version 2 settings and daily tracking stores", async () => {
+  const db = installFakeIndexedDb();
   const storage = await import("../public/scripts/storage.js");
 
   const writeResult = await storage.writeSetupStatus({
@@ -84,14 +110,13 @@ test("storage adapter opens version 1 settings store and writes/reads setup stat
   });
 
   assert.equal(writeResult.available, true);
-  assert.equal(writeResult.value.key, "setup-status");
-  assert.equal(writeResult.value.storage, "Ready");
-
-  const readResult = await storage.readSetupStatus();
-
-  assert.equal(readResult.available, true);
-  assert.equal(readResult.value.key, "setup-status");
-  assert.equal(readResult.value.storage, "Ready");
+  assert.deepEqual(Array.from(db.stores.keys()).sort(), ["days", "meals", "settings", "weights"]);
+  assert.equal(db.stores.get("settings").keyPath, "key");
+  assert.equal(db.stores.get("days").keyPath, "dayID");
+  assert.equal(db.stores.get("meals").keyPath, "id");
+  assert.equal(db.stores.get("weights").keyPath, "dayID");
+  assert.ok(db.stores.get("meals").indexes.has("byDay"));
+  assert.ok(db.stores.get("meals").indexes.has("byDaySlot"));
 });
 
 test("setup status writes update one stable settings record", async () => {

@@ -30,3 +30,32 @@ test("settings markup includes install status interaction and local-only copy", 
   assert.match(html, /Updates may require revisiting the app URL/);
   assert.match(html, /Browser storage can be cleared/);
 });
+
+test("today and plan shell expose the Phase 2 tracer surfaces", () => {
+  for (const label of ["Morning weight", "Today's meals", "Breakfast", "Lunch", "Dinner", "Optional Snack"]) {
+    assert.match(html, new RegExp(label), `missing ${label}`);
+  }
+
+  for (const copy of [
+    "Weight is just one data point. It is not a reflection of you.",
+    "Save weight",
+    "No weight entered today.",
+    "Not logged",
+    "Logged",
+    "Skipped",
+    "Log meal",
+    "Skip meal",
+    "Ate when hungry?",
+    "Stopped at enough?",
+    "Plan meals",
+    "Leave any slot blank if you do not want to plan it.",
+    "Save plan",
+    "No plan entered",
+  ]) {
+    assert.match(html, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `missing ${copy}`);
+  }
+
+  assert.match(html, /data-view="today"/);
+  assert.match(html, /data-view="plan"/);
+  assert.doesNotMatch(html, /required[^>]+data-plan-slot/);
+});
