@@ -61,6 +61,7 @@ document.querySelectorAll("[name='plan-day']").forEach((control) => {
 document.querySelectorAll("[data-plan-slot]").forEach((input) => {
   input.addEventListener("input", () => updatePlanSuggestions(input));
   input.addEventListener("focus", () => updatePlanSuggestions(input));
+  input.addEventListener("keydown", (event) => focusPlanSuggestionOnTab(event, input));
 });
 
 planForm?.addEventListener("focusout", (event) => {
@@ -252,6 +253,13 @@ async function updatePlanSuggestions(input) {
   const requestedDayID = planDayID;
   const requestID = ++planSuggestionRequestID;
 
+  if (input?.dataset.appliedPlanSuggestion === query) {
+    hidePlanSuggestions(input);
+    return;
+  }
+
+  delete input?.dataset.appliedPlanSuggestion;
+
   if (!slot || !query.trim()) {
     clearSuggestionFailureMessage();
     hidePlanSuggestions(input);
@@ -291,11 +299,17 @@ function renderPlanSuggestions(input, suggestions) {
     setText(button, suggestion);
     button.addEventListener("pointerdown", (event) => {
       event.preventDefault();
-      applyPlanSuggestion(input, suggestion);
+      applyPlanSuggestion(input, suggestion, { hide: false });
     });
     button.addEventListener("click", (event) => {
       event.preventDefault();
       applyPlanSuggestion(input, suggestion);
+    });
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        applyPlanSuggestion(input, suggestion);
+      }
     });
     list.append(button);
   }
@@ -328,15 +342,40 @@ function hideAllPlanSuggestions(exceptInput = null) {
   });
 }
 
-function applyPlanSuggestion(input, suggestionText) {
+function applyPlanSuggestion(input, suggestionText, options = {}) {
   if (!input?.isConnected) {
     return;
   }
 
   clearSuggestionFailureMessage();
+  planSuggestionRequestID += 1;
   input.value = suggestionText;
-  hidePlanSuggestions(input);
+  input.dataset.appliedPlanSuggestion = suggestionText;
+  if (options.hide !== false) {
+    hidePlanSuggestions(input);
+    setTimeout(() => {
+      if (input.isConnected && input.value === suggestionText) {
+        hidePlanSuggestions(input);
+      }
+    }, 0);
+  }
   input.focus({ preventScroll: true });
+}
+
+function focusPlanSuggestionOnTab(event, input) {
+  if (event.key !== "Tab" || event.shiftKey) {
+    return;
+  }
+
+  const list = planSuggestionList(input);
+  const firstSuggestion = list?.querySelector("button");
+
+  if (!list || list.hidden || !firstSuggestion) {
+    return;
+  }
+
+  event.preventDefault();
+  firstSuggestion.focus({ preventScroll: true });
 }
 
 function clearSuggestionFailureMessage() {
