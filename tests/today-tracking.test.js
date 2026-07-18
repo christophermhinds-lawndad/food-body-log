@@ -267,6 +267,47 @@ test("repository ensures four slots and preserves blank planned text", async () 
   assert.deepEqual(planState.meals.map((meal) => meal.plannedText), ["", "soup and toast", "Pasta", ""]);
 });
 
+test("planned text suggestions use local prior meals and hide blank queries", async () => {
+  const { repository } = await loadTrackingModules("plan-suggestions-tracer");
+
+  await repository.savePlan("2026-07-15", {
+    breakfast: "  Peanut butter toast  ",
+    lunch: "",
+    dinner: "Rice bowl",
+    snack: "Apple",
+  }, { now: new Date(2026, 6, 15, 19, 30, 0) });
+  await repository.savePlan("2026-07-16", {
+    breakfast: "Yogurt",
+    lunch: "Peanut noodles",
+    dinner: "Beans",
+    snack: "",
+  }, { now: new Date(2026, 6, 16, 19, 30, 0) });
+
+  const suggestions = await repository.getPlanSuggestions("peanut");
+  const emptySuggestions = await repository.getPlanSuggestions("   ");
+
+  assert.equal(suggestions.available, true);
+  assert.equal(suggestions.status, "Ready");
+  assert.deepEqual(suggestions.suggestions, ["Peanut noodles", "Peanut butter toast"]);
+  assert.deepEqual(emptySuggestions.suggestions, []);
+});
+
+test("tracking model ranks planned text suggestions by normalized shared words", async () => {
+  const { model } = await loadTrackingModules("model-suggestions-tracer");
+
+  assert.deepEqual(model.normalizedPlannedTextWords(" Peanut-butter, toast! "), ["peanut", "butter", "toast"]);
+  assert.deepEqual(
+    model.rankPlannedTextSuggestions("peanut toast", [
+      { plannedText: "Peanut noodles", updatedAt: "2026-07-16T19:30:00.000Z" },
+      { plannedText: "Peanut butter toast", updatedAt: "2026-07-15T19:30:00.000Z" },
+      { plannedText: "" },
+      { plannedText: "Rice bowl", updatedAt: "2026-07-17T19:30:00.000Z" },
+    ]),
+    ["Peanut butter toast", "Peanut noodles"],
+  );
+  assert.deepEqual(model.rankPlannedTextSuggestions("   ", [{ plannedText: "Peanut butter toast" }]), []);
+});
+
 test("plan saves update supplied slots without resetting sibling log state or answers", async () => {
   const { model, repository } = await loadTrackingModules("partial-plan");
   const later = new Date(2026, 6, 18, 9, 15, 0);
