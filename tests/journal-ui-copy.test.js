@@ -6,6 +6,7 @@ const html = await readFile(new URL("../public/index.html", import.meta.url), "u
 const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
 const modelSource = await readFile(new URL("../public/scripts/journal-model.js", import.meta.url), "utf8");
+const phase04UatUrl = new URL("../.planning/phases/04-evening-reflection-and-breakthroughs/04-UAT.md", import.meta.url);
 
 const journalRequiredCopy = [
   "Reflection",
@@ -129,6 +130,51 @@ test("journal UI state and mobile backstop coverage is statically named", () => 
     assert.match(`${html}\n${css}\n${appSource}`, new RegExp(escapeRegExp(state)), `missing state/backstop marker: ${state}`);
   }
 });
+
+test("Phase 04 UAT records mobile backstops without overstating unavailable device evidence", async () => {
+  const uat = await readFile(phase04UatUrl, "utf8");
+  const normalized = normalizeDoc(uat);
+
+  const requiredBackstops = [
+    "390px Journal layout",
+    "15-chip wrapping",
+    "long answer wrapping",
+    "one breakthrough",
+    "many breakthroughs",
+    "no-chip breakthrough",
+    "source-day message",
+    "remove/drop confirmation",
+    "source-answer survival copy",
+    "prompt cards, chip groups, textareas, and save controls do not create horizontal overflow or collide with the fixed bottom tab bar",
+    "many breakthrough cards stack vertically with page scrolling and no clipped action buttons",
+    "long answers and long unbroken words wrap inside breakthrough cards without clipping, horizontal scrolling, or overlap with actions",
+  ];
+
+  for (const backstop of requiredBackstops) {
+    assert.match(uat, new RegExp(escapeRegExp(backstop), "i"), `missing UAT backstop: ${backstop}`);
+  }
+
+  for (const unavailableEvidence of [
+    "physical iPhone 13",
+    "Home Screen install",
+    "hosted HTTPS URL",
+    "offline relaunch",
+  ]) {
+    assert.ok(
+      normalized.includes(`${unavailableEvidence.toLowerCase()} evidence: human-needed`),
+      `must mark ${unavailableEvidence} evidence human-needed`,
+    );
+  }
+
+  assert.doesNotMatch(uat, /physical iPhone 13 evidence:\s*(pass|passed|complete|local-browser-pass)/i);
+  assert.doesNotMatch(uat, /Home Screen install evidence:\s*(pass|passed|complete|local-browser-pass)/i);
+  assert.doesNotMatch(uat, /hosted HTTPS URL evidence:\s*(pass|passed|complete|local-browser-pass)/i);
+  assert.doesNotMatch(uat, /offline relaunch evidence:\s*(pass|passed|complete|local-browser-pass)/i);
+});
+
+function normalizeDoc(value) {
+  return value.toLowerCase().replace(/\s+/g, " ");
+}
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
