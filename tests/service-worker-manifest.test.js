@@ -19,6 +19,8 @@ const requiredShellAssets = [
   "./scripts/today-tracking.js?v=3",
   "./scripts/install-status.js?v=4",
   "./scripts/plan-suggestions-ui.js?v=4",
+  "./scripts/journal-model.js?v=1",
+  "./scripts/journal-tracking.js?v=1",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -26,18 +28,22 @@ const requiredShellAssets = [
   "./sw.js",
 ];
 
-const personalDataPatterns = [
+const forbiddenShellAssetPatterns = [
   "indexedDB",
-  "food",
-  "body",
-  "journal",
-  "weight",
-  "meal",
-  "days",
+  "journalAnswers",
+  "meals/",
+  "weights/",
+  "days/",
   "exports",
-  "settings/",
+  "imports",
   "data/",
   ".json",
+  "api/",
+  "account",
+  "analytics",
+  "package.json",
+  "package-lock.json",
+  "node_modules",
 ];
 
 test("service worker exposes current cache name and complete app-shell asset list", () => {
@@ -50,18 +56,18 @@ test("service worker exposes current cache name and complete app-shell asset lis
 });
 
 test("service worker cache list matches install-status expected shell assets", () => {
-  assert.equal(CURRENT_CACHE_NAME, "food-body-log-shell-v4");
+  assert.equal(CURRENT_CACHE_NAME, "food-body-log-shell-v5");
   assert.deepEqual(EXPECTED_SHELL_ASSETS, requiredShellAssets);
 });
 
 test("service worker cache boundary excludes personal data stores and user content paths", () => {
   const appShellBlock = swSource.match(/APP_SHELL = \[(?<assets>[\s\S]*?)\];/)?.groups?.assets || "";
 
-  for (const pattern of personalDataPatterns) {
+  for (const pattern of forbiddenShellAssetPatterns) {
     assert.doesNotMatch(appShellBlock, new RegExp(escapeRegExp(pattern), "i"), `must not cache ${pattern}`);
   }
 
-  assert.doesNotMatch(swSource, /indexedDB|localStorage|deleteDatabase|settings\/|data\/|exports\//i);
+  assert.doesNotMatch(swSource, /indexedDB|localStorage|deleteDatabase|settings\/|data\/|exports\/|imports\/|api\/|account|analytics|package\.json|node_modules/i);
 });
 
 test("cache readiness is Ready only when every expected shell asset is present", async () => {
