@@ -89,9 +89,49 @@ test("journal shell exposes reflection and breakthrough containers", () => {
   assert.match(html, /data-breakthrough-template/);
 });
 
+test("journal styling uses compact mobile-safe cards chips and actions", () => {
+  for (const selector of [
+    ".journal-section",
+    ".journal-prompt-card",
+    ".journal-chip-list",
+    ".journal-chip",
+    ".journal-chip[aria-pressed=\"true\"]",
+    ".breakthrough-card",
+    ".breakthrough-answer",
+    ".destructive-action",
+  ]) {
+    assert.match(css, new RegExp(escapeRegExp(selector)), `missing ${selector} styles`);
+  }
+
+  assert.match(css, /\.journal-prompt-card[\s\S]*border-radius: 8px;[\s\S]*background: var\(--surface\);/);
+  assert.match(css, /\.journal-textarea[\s\S]*min-height: 96px;[\s\S]*resize: vertical;[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(css, /\.journal-chip[\s\S]*min-height: 44px;[\s\S]*border-radius: 8px;/);
+  assert.match(css, /\.journal-chip\[aria-pressed="true"\][\s\S]*border-color: var\(--accent\);[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\);/);
+  assert.match(css, /\.breakthrough-answer[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(css, /\.destructive-action[\s\S]*border-color: var\(--destructive\);[\s\S]*color: var\(--destructive\);/);
+  assert.match(css, /--destructive: #8F3F36;/);
+});
+
+test("journal controls share the existing focus-visible treatment", () => {
+  const focusBlock = css.match(/\.primary-action:focus-visible[\s\S]*?\{[\s\S]*?outline: 3px solid var\(--accent\);[\s\S]*?\}/)?.[0] || "";
+
+  for (const selector of [
+    ".journal-chip:focus-visible",
+    "[data-toggle-breakthrough]:focus-visible",
+    "[data-source-day]:focus-visible",
+    "[data-drop-breakthrough]:focus-visible",
+  ]) {
+    assert.match(focusBlock, new RegExp(escapeRegExp(selector)), `missing focus selector ${selector}`);
+  }
+});
+
 test("plan suggestion styling is compact, touch-friendly, and wrapping-safe", () => {
   assert.match(css, /\.plan-suggestions\s*\{[\s\S]*display: grid;[\s\S]*gap: 8px;[\s\S]*\}/);
   assert.match(css, /\.plan-suggestion-option\s*\{[\s\S]*min-height: 44px;[\s\S]*padding: 8px;[\s\S]*border-radius: 8px;[\s\S]*font-size: 16px;[\s\S]*overflow-wrap: anywhere;[\s\S]*\}/);
   assert.match(css, /\.plan-suggestion-option:focus-visible/);
   assert.match(css, /\.plan-suggestion-option:hover\s*\{[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\);[\s\S]*\}/);
 });
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

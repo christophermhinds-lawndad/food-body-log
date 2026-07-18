@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
 const modelSource = await readFile(new URL("../public/scripts/journal-model.js", import.meta.url), "utf8");
 
@@ -33,6 +34,24 @@ const journalRequiredCopy = [
   "Drop from breakthroughs",
   "Breakthrough removed. The original answer stayed saved.",
   "Remove the breakthrough highlight? The original journal answer will stay saved.",
+];
+
+const forbiddenJournalCopy = [
+  "failure",
+  "cheat",
+  "bad food",
+  "good food",
+  "should have",
+  "slipped",
+  "ruined",
+  "streak",
+  "score",
+  "perfect",
+  "calories",
+  "macros",
+  "diet",
+  "weight-loss advice",
+  "should eat",
 ];
 
 test("journal surface exposes required Reflection and Breakthroughs copy", () => {
@@ -84,6 +103,31 @@ test("today meal cards still exclude reflection controls", () => {
   const mealSurface = html.match(/<div id="today-meal-list"[\s\S]*?<\/div>\s*<\/section>/)?.[0] || "";
 
   assert.doesNotMatch(mealSurface, /<textarea\b|data-journal|data-chip|Optional context|Optional detail|Mark as breakthrough|reflection prompt/i);
+});
+
+test("journal visible copy avoids forbidden diet scoring and shame language", () => {
+  const visibleJournalSource = `${html}\n${appSource}`.toLowerCase();
+
+  for (const forbidden of forbiddenJournalCopy) {
+    assert.doesNotMatch(visibleJournalSource, new RegExp(escapeRegExp(forbidden)), `forbidden Journal copy: ${forbidden}`);
+  }
+});
+
+test("journal UI state and mobile backstop coverage is statically named", () => {
+  for (const state of [
+    "Loading evening reflection...",
+    "Reflection could not be saved. Try again; data already saved on this device stays local.",
+    "No breakthroughs saved yet",
+    "breakthrough-empty",
+    "breakthrough-card",
+    "breakthrough-answer",
+    "journal-chip-list",
+    "journal-textarea",
+    "overflow-wrap: anywhere",
+    "@media (max-width: 430px)",
+  ]) {
+    assert.match(`${html}\n${css}\n${appSource}`, new RegExp(escapeRegExp(state)), `missing state/backstop marker: ${state}`);
+  }
 });
 
 function escapeRegExp(value) {
