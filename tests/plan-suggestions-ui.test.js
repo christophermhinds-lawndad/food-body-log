@@ -105,6 +105,30 @@ test("plan suggestion controller ignores stale async results after apply", async
   assert.equal(list.children.length, 0);
 });
 
+test("plan suggestion controller keeps typing usable when lookup is unavailable", async () => {
+  const { document, input, list, message } = createSuggestionHarness();
+  const controller = createPlanSuggestionController({
+    document,
+    getPlanDayID: () => "2026-07-19",
+    getPlanSuggestions: async () => ({ available: false, suggestions: [] }),
+    planMessage: message,
+    setText: (node, value) => {
+      node.textContent = value == null ? "" : String(value);
+    },
+    suggestionErrorMessage: "Suggestions could not be loaded. You can keep typing.",
+  });
+
+  input.focus();
+  input.value = "apple";
+  await controller.update(input);
+
+  assert.equal(input.value, "apple");
+  assert.equal(document.activeElement, input);
+  assert.equal(list.hidden, true);
+  assert.equal(list.children.length, 0);
+  assert.equal(message.textContent, "Suggestions could not be loaded. You can keep typing.");
+});
+
 function createSuggestionHarness() {
   const document = new FakeDocument();
   const input = new FakeElement(document, "input");
