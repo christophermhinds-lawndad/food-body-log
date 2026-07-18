@@ -46,13 +46,23 @@ export function getInstallModeStatus(environment = globalThis) {
 export async function getCacheReadinessStatus(options = {}) {
   const cachesLike = options.caches || globalThis.caches;
   const navigatorLike = options.navigator || globalThis.navigator;
+  const readinessTimeoutMs = options.readinessTimeoutMs ?? 3000;
 
   if (!cachesLike || !navigatorLike || !("serviceWorker" in navigatorLike)) {
     return "Unavailable";
   }
 
   try {
-    const registration = options.registration || await navigatorLike.serviceWorker.ready;
+    const registration = options.registration
+      || await Promise.race([
+        navigatorLike.serviceWorker.ready,
+        timeoutAfter(readinessTimeoutMs),
+      ]);
+
+    if (!registration) {
+      return "Not ready";
+    }
+
     const cache = await cachesLike.open(options.cacheName || CURRENT_CACHE_NAME);
     const scope = registration?.scope || globalThis.location?.href || "http://localhost/";
     const expectedAssets = options.expectedAssets || EXPECTED_SHELL_ASSETS;
@@ -63,6 +73,12 @@ export async function getCacheReadinessStatus(options = {}) {
   } catch {
     return "Needs reload";
   }
+}
+
+function timeoutAfter(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(null), milliseconds);
+  });
 }
 
 export async function collectInstallStatus(options = {}) {

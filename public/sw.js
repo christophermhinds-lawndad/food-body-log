@@ -40,11 +40,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (event.request.mode === "navigate") {
-    event.respondWith(fetch(event.request).catch(() => caches.match("./index.html")));
-    return;
-  }
-
   const requestUrl = new URL(event.request.url);
   const isSameOriginAppAsset = requestUrl.origin === self.location.origin;
 
@@ -52,5 +47,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  event.respondWith(fetchAndRefreshShellCache(event.request));
 });
+
+async function fetchAndRefreshShellCache(request) {
+  const fallback = request.mode === "navigate" ? "./index.html" : request;
+
+  try {
+    const response = await fetch(request);
+
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+
+      if (request.mode === "navigate") {
+        const shellFallbackUrl = new URL("./index.html", self.location.href).toString();
+        await cache.put(shellFallbackUrl, response.clone());
+      }
+    }
+
+    return response;
+  } catch {
+    return caches.match(fallback);
+  }
+}

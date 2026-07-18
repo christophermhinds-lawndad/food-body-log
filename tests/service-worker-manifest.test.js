@@ -71,6 +71,24 @@ test("cache readiness is Ready only when every expected shell asset is present",
   assert.equal(await getCacheReadinessStatus({ caches: null, navigator: navigatorLike }), "Unavailable");
 });
 
+test("cache readiness returns neutral status when service worker readiness never resolves", async () => {
+  const scope = "https://example.test/food-body-log/";
+  const readyCaches = createFakeCaches(scope, requiredShellAssets);
+  const navigatorLike = { serviceWorker: { ready: new Promise(() => {}) } };
+
+  assert.equal(
+    await getCacheReadinessStatus({ caches: readyCaches, navigator: navigatorLike, readinessTimeoutMs: 1 }),
+    "Not ready",
+  );
+});
+
+test("service worker refreshes cached same-origin shell responses during online fetches", () => {
+  assert.match(swSource, /event\.respondWith\(fetchAndRefreshShellCache\(event\.request\)\)/);
+  assert.match(swSource, /cache\.put\(request,\s*response\.clone\(\)\)/);
+  assert.match(swSource, /cache\.put\(shellFallbackUrl,\s*response\.clone\(\)\)/);
+  assert.match(swSource, /fetch\(request\)[\s\S]*caches\.match\(fallback\)/);
+});
+
 function createFakeCaches(scope, cachedAssets) {
   const cachedUrls = new Set(cachedAssets.map((asset) => new URL(asset, scope).toString()));
 
