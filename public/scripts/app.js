@@ -62,6 +62,30 @@ document.querySelectorAll("[data-plan-slot]").forEach((input) => {
   input.addEventListener("focus", () => updatePlanSuggestions(input));
 });
 
+planForm?.addEventListener("focusout", (event) => {
+  const input = event.target?.matches?.("[data-plan-slot]") ? event.target : null;
+  const nextTarget = event.relatedTarget;
+  const list = planSuggestionList(input);
+
+  if (!input || nextTarget === input || list?.contains(nextTarget)) {
+    return;
+  }
+
+  queueMicrotask(() => {
+    if (document.activeElement !== input && !list?.contains(document.activeElement)) {
+      hidePlanSuggestions(input);
+    }
+  });
+});
+
+document.addEventListener("pointerdown", (event) => {
+  const target = event.target;
+
+  if (!target?.closest?.("[data-plan-slot]") && !target?.closest?.("[data-plan-suggestions]")) {
+    hideAllPlanSuggestions();
+  }
+});
+
 document.querySelectorAll("[data-meal-form]").forEach((form) => {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -239,6 +263,7 @@ async function updatePlanSuggestions(input) {
   }
 
   if (!isReadyResult(result)) {
+    setText(planMessage, "Suggestions could not be loaded. You can keep typing.");
     hidePlanSuggestions(input);
     return;
   }

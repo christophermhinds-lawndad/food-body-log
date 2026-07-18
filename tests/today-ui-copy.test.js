@@ -7,6 +7,7 @@ const css = await readFile(new URL("../public/styles/app.css", import.meta.url),
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
 const repositorySource = await readFile(new URL("../public/scripts/today-tracking.js", import.meta.url), "utf8");
 const phaseUat = await readOptionalFile(new URL("../.planning/phases/02-today-tracking-loop/02-UAT.md", import.meta.url));
+const phaseThreeUat = await readOptionalFile(new URL("../.planning/phases/03-planning-suggestions/03-UAT.md", import.meta.url));
 
 const forbiddenVisibleCopy = [
   "calories",
@@ -144,6 +145,28 @@ test("plan suggestions render safely and stay outside the save path", () => {
   assert.match(appSource, /function applyPlanSuggestion\(input, suggestionText\)/);
   assert.doesNotMatch(appSource, /function applyPlanSuggestion[\s\S]*savePlan\(/);
   assert.doesNotMatch(appSource, /dataset\.planSlot !== "breakfast"/);
+});
+
+test("plan suggestion failure copy is non-blocking and UAT tracks visual backstops", () => {
+  assert.match(appSource, /Suggestions could not be loaded\. You can keep typing\./);
+  assert.match(appSource, /hideAllPlanSuggestions\(\);/);
+  assert.match(appSource, /document\.addEventListener\("pointerdown"/);
+  assert.match(appSource, /planForm\?\.addEventListener\("focusout"/);
+
+  for (const required of [
+    "390px Visual Checks",
+    "Long Text Wrapping",
+    "Keyboard And Focus",
+    "Outside Click And Blur",
+    "Today/Tomorrow Switching",
+    "Storage Unavailable",
+    "Offline Relaunch Boundary",
+    "iPhone 13 Home Screen Checks",
+    "human-needed",
+    "physical iPhone 13 and hosted HTTPS URL evidence not available",
+  ]) {
+    assert.match(phaseThreeUat, new RegExp(escapeRegExp(required)), `missing Phase 03 UAT item: ${required}`);
+  }
 });
 
 test("plan suggestions stay local-only without external or package artifacts", async () => {

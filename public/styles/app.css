@@ -157,6 +157,7 @@ p {
 .primary-action:focus-visible,
 .secondary-action:focus-visible,
 .text-field:focus-visible,
+.plan-suggestion-option:focus-visible,
 .segmented-control label:focus-within,
 .metric-group label:focus-within,
 .tab-button:focus-visible {
@@ -272,6 +273,41 @@ p {
   background: var(--surface);
   color: var(--text);
   font: inherit;
+}
+
+.plan-suggestions {
+  display: grid;
+  gap: 8px;
+  margin-top: -12px;
+}
+
+.plan-suggestions[hidden] {
+  display: none;
+}
+
+.plan-suggestion-option {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.plan-suggestion-option:hover {
+  border-color: var(--accent);
+  background: var(--surface-secondary);
+  box-shadow: inset 4px 0 0 var(--accent);
 }
 
 .segmented-control,

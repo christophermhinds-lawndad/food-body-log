@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 
 test("shell markup exposes all tabs with Today active by default", () => {
   const tabLabels = ["Today", "Plan", "Reports", "Journal", "History", "Settings"];
@@ -75,4 +76,11 @@ test("plan shell gives every meal field an associated inline suggestion containe
   }
 
   assert.equal((html.match(/data-plan-suggestions=/g) || []).length, 4);
+});
+
+test("plan suggestion styling is compact, touch-friendly, and wrapping-safe", () => {
+  assert.match(css, /\.plan-suggestions\s*\{[\s\S]*display: grid;[\s\S]*gap: 8px;[\s\S]*\}/);
+  assert.match(css, /\.plan-suggestion-option\s*\{[\s\S]*min-height: 44px;[\s\S]*padding: 8px;[\s\S]*border-radius: 8px;[\s\S]*font-size: 16px;[\s\S]*overflow-wrap: anywhere;[\s\S]*\}/);
+  assert.match(css, /\.plan-suggestion-option:focus-visible/);
+  assert.match(css, /\.plan-suggestion-option:hover\s*\{[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\);[\s\S]*\}/);
 });
