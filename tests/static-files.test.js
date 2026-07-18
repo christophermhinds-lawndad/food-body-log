@@ -15,6 +15,7 @@ const requiredPublishFiles = [
   "sw.js",
   "styles/app.css",
   "scripts/app.js",
+  "scripts/plan-suggestions-ui.js",
   "scripts/paths.js",
   "scripts/storage.js",
   "scripts/day-policy.js",

@@ -1,10 +1,11 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=3";
+import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=4";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
 import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=3";
+import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
 
 const appPaths = createAppPaths();
 
@@ -30,7 +31,14 @@ const planMessage = document.querySelector("#plan-message");
 const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded. You can keep typing.";
 let todayDayID = getTodayDayID();
 let planDayID = getTomorrowDayID();
-let planSuggestionRequestID = 0;
+const planSuggestions = createPlanSuggestionController({
+  document,
+  getPlanSuggestions,
+  getPlanDayID: () => planDayID,
+  planMessage,
+  setText,
+  suggestionErrorMessage: SUGGESTION_ERROR_MESSAGE,
+});
 
 document.querySelectorAll("[data-tab]").forEach((button) => {
   button.addEventListener("click", () => selectTab(button.dataset.tab));
@@ -53,21 +61,19 @@ planForm?.addEventListener("submit", (event) => {
 document.querySelectorAll("[name='plan-day']").forEach((control) => {
   control.addEventListener("change", () => {
     planDayID = selectedPlanDayID();
-    hideAllPlanSuggestions();
+    planSuggestions.hideAll();
     loadPlanView();
   });
 });
 
 document.querySelectorAll("[data-plan-slot]").forEach((input) => {
-  input.addEventListener("input", () => updatePlanSuggestions(input));
-  input.addEventListener("focus", () => updatePlanSuggestions(input));
-  input.addEventListener("keydown", (event) => focusPlanSuggestionOnTab(event, input));
+  planSuggestions.attachInput(input);
 });
 
 planForm?.addEventListener("focusout", (event) => {
   const input = event.target?.matches?.("[data-plan-slot]") ? event.target : null;
   const nextTarget = event.relatedTarget;
-  const list = planSuggestionList(input);
+  const list = planSuggestions.listFor(input);
 
   if (!input || nextTarget === input || list?.contains(nextTarget)) {
     return;
@@ -75,7 +81,7 @@ planForm?.addEventListener("focusout", (event) => {
 
   queueMicrotask(() => {
     if (document.activeElement !== input && !list?.contains(document.activeElement)) {
-      hidePlanSuggestions(input);
+      planSuggestions.hide(input);
     }
   });
 });
@@ -84,7 +90,7 @@ document.addEventListener("pointerdown", (event) => {
   const target = event.target;
 
   if (!target?.closest?.("[data-plan-slot]") && !target?.closest?.("[data-plan-suggestions]")) {
-    hideAllPlanSuggestions();
+    planSuggestions.hideAll();
   }
 });
 
@@ -193,7 +199,7 @@ async function loadTodayView() {
 async function loadPlanView() {
   refreshCurrentDayIDs();
   const requestedDayID = planDayID;
-  hideAllPlanSuggestions();
+  planSuggestions.hideAll();
   setPlanFormDisabled(true);
   setText(planMessage, "Loading plan...");
   const state = await getPlanState(requestedDayID);
@@ -222,7 +228,7 @@ async function loadPlanView() {
 async function saveSelectedPlan() {
   refreshCurrentDayIDs();
   const selectedDayID = planDayID;
-  hideAllPlanSuggestions();
+  planSuggestions.hideAll();
   setPlanFormDisabled(true);
   const plannedTextBySlot = Object.fromEntries(
     Array.from(document.querySelectorAll("[data-plan-slot]")).map((input) => [input.dataset.planSlot, input.value]),
@@ -245,148 +251,6 @@ async function saveSelectedPlan() {
   if (selectedDayID === todayDayID && result.day.dayID === todayDayID) {
     renderTodayState(result);
   }
-}
-
-async function updatePlanSuggestions(input) {
-  const slot = input?.dataset.planSlot;
-  const query = input?.value || "";
-  const requestedDayID = planDayID;
-  const requestID = ++planSuggestionRequestID;
-
-  if (input?.dataset.appliedPlanSuggestion === query) {
-    hidePlanSuggestions(input);
-    return;
-  }
-
-  delete input?.dataset.appliedPlanSuggestion;
-
-  if (!slot || !query.trim()) {
-    clearSuggestionFailureMessage();
-    hidePlanSuggestions(input);
-    return;
-  }
-
-  const result = await getPlanSuggestions(query);
-
-  if (requestID !== planSuggestionRequestID || requestedDayID !== planDayID || document.activeElement !== input) {
-    return;
-  }
-
-  if (!isReadyResult(result)) {
-    setText(planMessage, SUGGESTION_ERROR_MESSAGE);
-    hidePlanSuggestions(input);
-    return;
-  }
-
-  clearSuggestionFailureMessage();
-  renderPlanSuggestions(input, result.suggestions);
-}
-
-function renderPlanSuggestions(input, suggestions) {
-  const list = planSuggestionList(input);
-
-  if (!list || !Array.isArray(suggestions) || suggestions.length === 0) {
-    hidePlanSuggestions(input);
-    return;
-  }
-
-  hideAllPlanSuggestions(input);
-  list.replaceChildren();
-  for (const suggestion of suggestions) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "plan-suggestion-option";
-    setText(button, suggestion);
-    button.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-      applyPlanSuggestion(input, suggestion, { hide: false });
-    });
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      applyPlanSuggestion(input, suggestion);
-    });
-    button.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        applyPlanSuggestion(input, suggestion);
-      }
-    });
-    list.append(button);
-  }
-
-  list.hidden = false;
-  input.setAttribute("aria-expanded", "true");
-}
-
-function hidePlanSuggestions(inputOrSlot) {
-  const list = planSuggestionList(inputOrSlot);
-  const input = typeof inputOrSlot === "string"
-    ? document.querySelector(`[data-plan-slot="${inputOrSlot}"]`)
-    : inputOrSlot;
-
-  if (list) {
-    list.replaceChildren();
-    list.hidden = true;
-  }
-
-  input?.setAttribute("aria-expanded", "false");
-}
-
-function hideAllPlanSuggestions(exceptInput = null) {
-  document.querySelectorAll("[data-plan-suggestions]").forEach((list) => {
-    if (exceptInput?.dataset.planSlot === list.dataset.planSuggestions) {
-      return;
-    }
-
-    hidePlanSuggestions(list.dataset.planSuggestions);
-  });
-}
-
-function applyPlanSuggestion(input, suggestionText, options = {}) {
-  if (!input?.isConnected) {
-    return;
-  }
-
-  clearSuggestionFailureMessage();
-  planSuggestionRequestID += 1;
-  input.value = suggestionText;
-  input.dataset.appliedPlanSuggestion = suggestionText;
-  if (options.hide !== false) {
-    hidePlanSuggestions(input);
-    setTimeout(() => {
-      if (input.isConnected && input.value === suggestionText) {
-        hidePlanSuggestions(input);
-      }
-    }, 0);
-  }
-  input.focus({ preventScroll: true });
-}
-
-function focusPlanSuggestionOnTab(event, input) {
-  if (event.key !== "Tab" || event.shiftKey) {
-    return;
-  }
-
-  const list = planSuggestionList(input);
-  const firstSuggestion = list?.querySelector("button");
-
-  if (!list || list.hidden || !firstSuggestion) {
-    return;
-  }
-
-  event.preventDefault();
-  firstSuggestion.focus({ preventScroll: true });
-}
-
-function clearSuggestionFailureMessage() {
-  if (planMessage?.textContent === SUGGESTION_ERROR_MESSAGE) {
-    setText(planMessage, "");
-  }
-}
-
-function planSuggestionList(inputOrSlot) {
-  const slot = typeof inputOrSlot === "string" ? inputOrSlot : inputOrSlot?.dataset.planSlot;
-  return slot ? document.querySelector(`[data-plan-suggestions="${slot}"]`) : null;
 }
 
 async function saveTodayWeight() {

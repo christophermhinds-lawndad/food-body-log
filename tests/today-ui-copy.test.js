@@ -5,6 +5,7 @@ import test from "node:test";
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
+const suggestionSource = await readFile(new URL("../public/scripts/plan-suggestions-ui.js", import.meta.url), "utf8");
 const repositorySource = await readFile(new URL("../public/scripts/today-tracking.js", import.meta.url), "utf8");
 const phaseUat = await readOptionalFile(new URL("../.planning/phases/02-today-tracking-loop/02-UAT.md", import.meta.url));
 const phaseThreeUat = await readOptionalFile(new URL("../.planning/phases/03-planning-suggestions/03-UAT.md", import.meta.url));
@@ -130,7 +131,7 @@ test("today and plan storage paths refresh local day IDs before use", () => {
 });
 
 test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () => {
-  const visibleRuntimeSource = `${html}\n${appSource}`.toLowerCase();
+  const visibleRuntimeSource = `${html}\n${appSource}\n${suggestionSource}`.toLowerCase();
 
   for (const forbidden of forbiddenVisibleCopy) {
     assert.doesNotMatch(visibleRuntimeSource, new RegExp(escapeRegExp(forbidden)), `forbidden visible copy: ${forbidden}`);
@@ -138,34 +139,35 @@ test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () =
 });
 
 test("plan suggestions render safely and stay outside the save path", () => {
-  assert.match(appSource, /function renderPlanSuggestions\(input, suggestions\)/);
-  assert.match(appSource, /setText\(button, suggestion\)/);
-  assert.doesNotMatch(appSource, /plan-suggestion[\s\S]{0,500}\.innerHTML\s*=/);
-  assert.match(appSource, /button\.type = "button"/);
-  assert.match(appSource, /button\.addEventListener\("pointerdown", \(event\) => \{\n\s+event\.preventDefault\(\);\n\s+applyPlanSuggestion\(input, suggestion, \{ hide: false \}\);/);
-  assert.match(appSource, /button\.addEventListener\("click", \(event\) => \{\n\s+event\.preventDefault\(\);\n\s+applyPlanSuggestion\(input, suggestion\);/);
-  assert.match(appSource, /button\.addEventListener\("keydown", \(event\) => \{/);
-  assert.match(appSource, /event\.key === "Enter" \|\| event\.key === " "/);
-  assert.match(appSource, /event\.preventDefault\(\);\n\s+applyPlanSuggestion\(input, suggestion\);/);
-  assert.match(appSource, /function applyPlanSuggestion\(input, suggestionText, options = \{\}\)/);
-  assert.match(appSource, /function applyPlanSuggestion\(input, suggestionText, options = \{\}\)[\s\S]*planSuggestionRequestID \+= 1;/);
-  assert.match(appSource, /input\.dataset\.appliedPlanSuggestion = suggestionText;/);
-  assert.match(appSource, /if \(input\?\.dataset\.appliedPlanSuggestion === query\) \{\n\s+hidePlanSuggestions\(input\);\n\s+return;/);
-  assert.match(appSource, /if \(options\.hide !== false\) \{\n\s+hidePlanSuggestions\(input\);/);
-  assert.match(appSource, /setTimeout\(\(\) => \{\n\s+if \(input\.isConnected && input\.value === suggestionText\) \{\n\s+hidePlanSuggestions\(input\);/);
-  assert.match(appSource, /input\.addEventListener\("keydown", \(event\) => focusPlanSuggestionOnTab\(event, input\)\);/);
-  assert.match(appSource, /function focusPlanSuggestionOnTab\(event, input\)/);
-  assert.match(appSource, /event\.key !== "Tab" \|\| event\.shiftKey/);
-  assert.match(appSource, /firstSuggestion\.focus\(\{ preventScroll: true \}\);/);
-  assert.doesNotMatch(appSource, /function applyPlanSuggestion[\s\S]*savePlan\(/);
-  assert.doesNotMatch(appSource, /dataset\.planSlot !== "breakfast"/);
+  assert.match(appSource, /createPlanSuggestionController/);
+  assert.match(suggestionSource, /function render\(input, suggestions\)/);
+  assert.match(suggestionSource, /setText\(button, suggestion\)/);
+  assert.doesNotMatch(suggestionSource, /plan-suggestion[\s\S]{0,500}\.innerHTML\s*=/);
+  assert.match(suggestionSource, /button\.type = "button"/);
+  assert.match(suggestionSource, /button\.addEventListener\("pointerdown", \(event\) => \{\n\s+event\.preventDefault\(\);\n\s+apply\(input, suggestion, \{ hide: false \}\);/);
+  assert.match(suggestionSource, /button\.addEventListener\("click", \(event\) => \{\n\s+event\.preventDefault\(\);\n\s+apply\(input, suggestion\);/);
+  assert.match(suggestionSource, /button\.addEventListener\("keydown", \(event\) => \{/);
+  assert.match(suggestionSource, /event\.key === "Enter" \|\| event\.key === " "/);
+  assert.match(suggestionSource, /event\.preventDefault\(\);\n\s+apply\(input, suggestion\);/);
+  assert.match(suggestionSource, /function apply\(input, suggestionText, applyOptions = \{\}\)/);
+  assert.match(suggestionSource, /function apply\(input, suggestionText, applyOptions = \{\}\)[\s\S]*requestID \+= 1;/);
+  assert.match(suggestionSource, /input\.dataset\.appliedPlanSuggestion = suggestionText;/);
+  assert.match(suggestionSource, /if \(input\?\.dataset\.appliedPlanSuggestion === query\) \{\n\s+hide\(input\);\n\s+return;/);
+  assert.match(suggestionSource, /if \(applyOptions\.hide !== false\) \{\n\s+hide\(input\);/);
+  assert.match(suggestionSource, /setTimeout\(\(\) => \{\n\s+if \(input\.isConnected && input\.value === suggestionText\) \{\n\s+hide\(input\);/);
+  assert.match(suggestionSource, /input\.addEventListener\("keydown", \(event\) => focusSuggestionOnTab\(event, input\)\);/);
+  assert.match(suggestionSource, /function focusSuggestionOnTab\(event, input\)/);
+  assert.match(suggestionSource, /event\.key !== "Tab" \|\| event\.shiftKey/);
+  assert.match(suggestionSource, /firstSuggestion\.focus\(\{ preventScroll: true \}\);/);
+  assert.doesNotMatch(suggestionSource, /function apply[\s\S]*savePlan\(/);
+  assert.doesNotMatch(suggestionSource, /dataset\.planSlot !== "breakfast"/);
 });
 
 test("plan suggestion failure copy is non-blocking and UAT tracks visual backstops", () => {
   assert.match(appSource, /const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded\. You can keep typing\."/);
-  assert.match(appSource, /function clearSuggestionFailureMessage\(\)/);
-  assert.match(appSource, /planMessage\?\.textContent === SUGGESTION_ERROR_MESSAGE/);
-  assert.match(appSource, /hideAllPlanSuggestions\(\);/);
+  assert.match(suggestionSource, /function clearFailureMessage\(\)/);
+  assert.match(suggestionSource, /planMessage\?\.textContent === suggestionErrorMessage/);
+  assert.match(appSource, /planSuggestions\.hideAll\(\);/);
   assert.match(appSource, /document\.addEventListener\("pointerdown"/);
   assert.match(appSource, /planForm\?\.addEventListener\("focusout"/);
 
@@ -188,7 +190,7 @@ test("plan suggestion failure copy is non-blocking and UAT tracks visual backsto
 test("plan suggestions stay local-only without external or package artifacts", async () => {
   const packageJson = await readOptionalFile(new URL("../package.json", import.meta.url));
   const packageLock = await readOptionalFile(new URL("../package-lock.json", import.meta.url));
-  const runtimeSource = `${appSource}\n${repositorySource}`;
+  const runtimeSource = `${appSource}\n${suggestionSource}\n${repositorySource}`;
 
   assert.match(repositorySource, /objectStore\(MEALS_STORE\)\.getAll\(\)/);
   assert.doesNotMatch(runtimeSource, /\bfetch\(|XMLHttpRequest|navigator\.sendBeacon|https?:\/\//);
