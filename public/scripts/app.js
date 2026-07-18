@@ -58,10 +58,6 @@ document.querySelectorAll("[name='plan-day']").forEach((control) => {
 });
 
 document.querySelectorAll("[data-plan-slot]").forEach((input) => {
-  if (input.dataset.planSlot !== "breakfast") {
-    return;
-  }
-
   input.addEventListener("input", () => updatePlanSuggestions(input));
   input.addEventListener("focus", () => updatePlanSuggestions(input));
 });
