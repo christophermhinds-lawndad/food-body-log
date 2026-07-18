@@ -7,6 +7,7 @@
   --text: #1F2933;
   --text-secondary: #596670;
   --border: #D8DED8;
+  --destructive: #8F3F36;
 }
 
 * {
@@ -157,6 +158,10 @@ p {
 .primary-action:focus-visible,
 .secondary-action:focus-visible,
 .text-field:focus-visible,
+.journal-chip:focus-visible,
+[data-toggle-breakthrough]:focus-visible,
+[data-source-day]:focus-visible,
+[data-drop-breakthrough]:focus-visible,
 .plan-suggestion-option:focus-visible,
 .segmented-control label:focus-within,
 .metric-group label:focus-within,
@@ -363,6 +368,114 @@ p {
   gap: 8px;
 }
 
+.journal-view,
+.journal-section,
+.journal-prompt-list,
+.breakthrough-list {
+  display: grid;
+  gap: 16px;
+}
+
+.journal-section {
+  min-width: 0;
+}
+
+.journal-prompt-card,
+.breakthrough-card {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.journal-textarea {
+  min-height: 96px;
+  resize: vertical;
+  overflow-wrap: anywhere;
+}
+
+.journal-chip-group {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-secondary);
+}
+
+.journal-chip-group legend {
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.journal-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.journal-chip {
+  min-height: 44px;
+  margin: 0;
+  border-radius: 8px;
+}
+
+.journal-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface-secondary);
+  color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.breakthrough-state {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 32px;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.breakthrough-state::before {
+  content: "✓";
+}
+
+.breakthrough-card h3 {
+  overflow-wrap: anywhere;
+}
+
+.breakthrough-answer,
+.breakthrough-chip-row {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+}
+
+.breakthrough-chip-row {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.destructive-action {
+  border-color: var(--destructive);
+  color: var(--destructive);
+}
+
 .button-row:has([data-unskip-meal]:not([hidden])) {
   grid-template-columns: 1fr;
 }
@@ -480,5 +593,17 @@ p {
 
   .meal-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 430px) {
+  .journal-prompt-card,
+  .breakthrough-card {
+    padding: 16px;
+  }
+
+  .journal-chip-list,
+  .breakthrough-card .button-row {
+    grid-template-columns: 1fr;
   }
 }

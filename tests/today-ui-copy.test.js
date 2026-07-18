@@ -202,7 +202,7 @@ test("meal logging surface excludes notes, reflection prompts, chips, and emotio
   const mealSurface = html.match(/<div id="today-meal-list"[\s\S]*?<\/div>\s*<\/section>/)?.[0] || "";
 
   assert.doesNotMatch(mealSurface, /<textarea\b|data-chip|chip-list|reflection|journal prompt|emotion|context|notes/i);
-  assert.doesNotMatch(appSource, /data-chip|chip-list|journal prompt|emotion picker|reflection prompt/i);
+  assert.doesNotMatch(mealSurface, /data-chip|chip-list|journal prompt|emotion picker|reflection prompt/i);
 });
 
 test("phase 2 UAT records manual timing and target-device checks without claiming pass", () => {
