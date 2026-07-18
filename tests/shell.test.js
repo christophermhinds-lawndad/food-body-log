@@ -78,6 +78,17 @@ test("plan shell gives every meal field an associated inline suggestion containe
   assert.equal((html.match(/data-plan-suggestions=/g) || []).length, 4);
 });
 
+test("journal shell exposes reflection and breakthrough containers", () => {
+  assert.match(html, /data-view="journal"/);
+  assert.match(html, /id="journal-form"/);
+  assert.match(html, /id="journal-prompt-list"/);
+  assert.match(html, /id="journal-message" class="status-message" aria-live="polite"/);
+  assert.match(html, /id="breakthrough-list"/);
+  assert.match(html, /id="breakthrough-message" class="status-message" aria-live="polite"/);
+  assert.match(html, /data-journal-prompt-template/);
+  assert.match(html, /data-breakthrough-template/);
+});
+
 test("plan suggestion styling is compact, touch-friendly, and wrapping-safe", () => {
   assert.match(css, /\.plan-suggestions\s*\{[\s\S]*display: grid;[\s\S]*gap: 8px;[\s\S]*\}/);
   assert.match(css, /\.plan-suggestion-option\s*\{[\s\S]*min-height: 44px;[\s\S]*padding: 8px;[\s\S]*border-radius: 8px;[\s\S]*font-size: 16px;[\s\S]*overflow-wrap: anywhere;[\s\S]*\}/);
