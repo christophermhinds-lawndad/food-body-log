@@ -12,6 +12,7 @@ const requiredPublishFiles = [
   "sw.js",
   "styles/app.css",
   "scripts/app.js",
+  "scripts/paths.js",
   "scripts/storage.js",
   "icons/icon-192.png",
   "icons/icon-512.png",

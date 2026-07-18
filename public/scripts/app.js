@@ -1,4 +1,7 @@
+import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
+
+const appPaths = createAppPaths();
 
 const SHELL_ASSETS = [
   "./",
@@ -57,7 +60,9 @@ async function registerServiceWorker() {
   }
 
   try {
-    await navigator.serviceWorker.register("./sw.js");
+    await navigator.serviceWorker.register(appPaths.serviceWorkerScriptUrl(), {
+      scope: appPaths.serviceWorkerScope(),
+    });
   } catch {
     setStatus(statusNodes.offlineCache, "Not ready");
   }
