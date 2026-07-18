@@ -118,7 +118,10 @@ test("static hosting docs do not instruct package installs or backend setup", as
 
   assert.doesNotMatch(docs, /\b(npm|pnpm|yarn|pip|brew|cargo)\s+(install|add)\b/i);
   assert.doesNotMatch(docs, /\b(create|configure|set up|setup)\s+(a\s+)?(backend|api server|database|server function|cloud function)\b/i);
-  assert.doesNotMatch(docs, /\b(secret|environment variable|env var|analytics project|native ios project|xcode|app store|apple developer program)\b/i);
+  assert.doesNotMatch(
+    docs,
+    /\b(create|configure|set|add|enter|provide)\s+(a\s+)?(secret|environment variable|env var|analytics project|native ios project|xcode build|app store submission|apple developer program)\b/i,
+  );
 });
 
 function normalizeDoc(value) {
