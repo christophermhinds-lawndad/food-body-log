@@ -198,6 +198,43 @@ test("repository ensures four slots and preserves blank planned text", async () 
   assert.deepEqual(planState.meals.map((meal) => meal.plannedText), ["", "soup and toast", "Pasta", ""]);
 });
 
+test("plan saves update supplied slots without resetting sibling log state or answers", async () => {
+  const { model, repository } = await loadTrackingModules("partial-plan");
+
+  await repository.savePlan(TODAY_ID, {
+    breakfast: "Oatmeal",
+    lunch: "Rice bowl",
+    dinner: "Soup",
+    snack: "",
+  });
+  await repository.saveMealLog(TODAY_ID, "lunch", {
+    ateWhenHungry: model.MEAL_ANSWERS.no,
+    stoppedAtEnough: model.MEAL_ANSWERS.yes,
+    now: FIXED_NOW,
+  });
+  await repository.savePlan(TODAY_ID, {
+    breakfast: "",
+  });
+
+  const todayState = await repository.getTodayTrackingState({ now: FIXED_NOW });
+  const meals = Object.fromEntries(todayState.meals.map((meal) => [meal.slot, meal]));
+
+  assert.equal(todayState.meals.length, 4);
+  assert.deepEqual(todayState.meals.map((meal) => meal.id), [
+    `${TODAY_ID}:breakfast`,
+    `${TODAY_ID}:lunch`,
+    `${TODAY_ID}:dinner`,
+    `${TODAY_ID}:snack`,
+  ]);
+  assert.equal(meals.breakfast.plannedText, "");
+  assert.equal(meals.lunch.plannedText, "Rice bowl");
+  assert.equal(meals.lunch.logState, model.MEAL_STATES.logged);
+  assert.equal(meals.lunch.ateWhenHungry, model.MEAL_ANSWERS.no);
+  assert.equal(meals.lunch.stoppedAtEnough, model.MEAL_ANSWERS.yes);
+  assert.equal(meals.dinner.plannedText, "Soup");
+  assert.equal(meals.snack.plannedText, "");
+});
+
 test("saving one meal log updates that slot only and preserves sibling records", async () => {
   const { model, repository } = await loadTrackingModules("meal-save");
 
@@ -226,6 +263,48 @@ test("saving one meal log updates that slot only and preserves sibling records",
   assert.equal(meals.lunch.stoppedAtEnough, model.MEAL_ANSWERS.no);
   assert.equal(meals.dinner.logState, model.MEAL_STATES.notLogged);
   assert.equal(meals.snack.logState, model.MEAL_STATES.notLogged);
+});
+
+test("partial non-skipped meal answers return an affected-slot failure without persisting logged state", async () => {
+  const { model, repository } = await loadTrackingModules("partial-log");
+
+  await repository.savePlan(TODAY_ID, {
+    breakfast: "Oatmeal",
+    lunch: "Rice bowl",
+    dinner: "Soup",
+    snack: "Yogurt",
+  });
+
+  assert.throws(
+    () => model.applyLoggedMeal(model.createDefaultMeal(TODAY_ID, "breakfast"), {
+      ateWhenHungry: model.MEAL_ANSWERS.yes,
+      stoppedAtEnough: model.MEAL_ANSWERS.unanswered,
+      now: FIXED_NOW,
+    }),
+    /require both metric answers/i,
+  );
+
+  const partialResult = await repository.saveMealLog(TODAY_ID, "breakfast", {
+    ateWhenHungry: model.MEAL_ANSWERS.yes,
+    stoppedAtEnough: model.MEAL_ANSWERS.unanswered,
+    now: FIXED_NOW,
+  });
+  const todayState = await repository.getTodayTrackingState({ now: FIXED_NOW });
+  const meals = Object.fromEntries(todayState.meals.map((meal) => [meal.slot, meal]));
+
+  assert.equal(partialResult.available, true);
+  assert.equal(partialResult.status, "Invalid");
+  assert.deepEqual(partialResult.error, {
+    code: "partial-metric-answers",
+    dayID: TODAY_ID,
+    slot: "breakfast",
+  });
+  assert.equal(meals.breakfast.logState, model.MEAL_STATES.notLogged);
+  assert.equal(meals.breakfast.ateWhenHungry, model.MEAL_ANSWERS.unanswered);
+  assert.equal(meals.breakfast.stoppedAtEnough, model.MEAL_ANSWERS.unanswered);
+  assert.equal(meals.lunch.plannedText, "Rice bowl");
+  assert.equal(meals.dinner.plannedText, "Soup");
+  assert.equal(meals.snack.plannedText, "Yogurt");
 });
 
 test("skipped meals and daily weight upserts stay distinct", async () => {
