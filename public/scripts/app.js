@@ -344,7 +344,7 @@ async function saveJournalReflection() {
   refreshCurrentDayIDs();
   const selectedDayID = journalDayID || todayDayID;
   setJournalFormDisabled(true);
-  const result = await saveReflection(selectedDayID, serializeJournalAnswers());
+  const result = await saveCurrentJournalDraft();
 
   if (selectedDayID !== journalDayID) {
     return;
@@ -359,6 +359,11 @@ async function saveJournalReflection() {
 
   renderJournalState(result);
   setText(journalMessage, "Reflection saved.");
+}
+
+async function saveCurrentJournalDraft() {
+  const selectedDayID = journalDayID || todayDayID;
+  return saveReflection(selectedDayID, serializeJournalAnswers());
 }
 
 function serializeJournalAnswers() {
@@ -389,7 +394,22 @@ async function toggleAnswerBreakthrough(button) {
     return;
   }
 
+  setJournalFormDisabled(true);
+  const saved = await saveCurrentJournalDraft();
+  if (!saved) {
+    setJournalFormDisabled(false);
+    setText(journalMessage, JOURNAL_SAVE_ERROR_MESSAGE);
+    return;
+  }
+
+  if (!isReadyResult(saved)) {
+    setJournalFormDisabled(false);
+    setText(journalMessage, JOURNAL_SAVE_ERROR_MESSAGE);
+    return;
+  }
+
   const result = await setAnswerBreakthrough(answerID, !isMarked);
+  setJournalFormDisabled(false);
 
   if (!isReadyResult(result)) {
     setText(journalMessage, "Breakthrough could not be updated. Try again.");
@@ -408,7 +428,22 @@ async function dropSelectedBreakthrough(button) {
     return;
   }
 
+  setJournalFormDisabled(true);
+  const saved = await saveCurrentJournalDraft();
+  if (!saved) {
+    setJournalFormDisabled(false);
+    setText(breakthroughMessage, JOURNAL_SAVE_ERROR_MESSAGE);
+    return;
+  }
+
+  if (!isReadyResult(saved)) {
+    setJournalFormDisabled(false);
+    setText(breakthroughMessage, JOURNAL_SAVE_ERROR_MESSAGE);
+    return;
+  }
+
   const result = await dropBreakthrough(answerID);
+  setJournalFormDisabled(false);
 
   if (!isReadyResult(result)) {
     setText(breakthroughMessage, "Breakthrough could not be removed. Try again.");

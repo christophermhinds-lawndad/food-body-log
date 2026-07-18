@@ -90,6 +90,8 @@ test("journal controller imports repository and wires load save breakthrough act
 });
 
 test("journal dynamic rendering uses DOM nodes and scoped closest actions", () => {
+  const runtimeSource = `${appSource}\n${modelSource}`;
+
   assert.match(appSource, /document\.createElement\("article"\)/);
   assert.match(appSource, /textArea\.value = answer\?\.text \|\| ""/);
   assert.match(appSource, /setText\(.*breakthrough\.text/);
@@ -97,7 +99,15 @@ test("journal dynamic rendering uses DOM nodes and scoped closest actions", () =
   assert.match(appSource, /button\.closest\("\[data-breakthrough-card\]"\)/);
   assert.match(appSource, /window\.confirm\("Remove breakthrough: Remove the breakthrough highlight\? The original journal answer will stay saved\."\)/);
   assert.match(appSource, /window\.confirm\("Drop breakthrough: Drop this breakthrough\? The original journal answer will stay saved\."\)/);
-  assert.doesNotMatch(appSource, /journal[\s\S]{0,2200}\.innerHTML\s*=/);
+  assert.doesNotMatch(runtimeSource, /\.innerHTML\s*=/);
+  assert.doesNotMatch(runtimeSource, /\binsertAdjacentHTML\s*\(/);
+  assert.doesNotMatch(runtimeSource, /\bouterHTML\s*=/);
+});
+
+test("breakthrough metadata actions save unsaved reflection fields before reloading", () => {
+  assert.match(appSource, /async function saveCurrentJournalDraft\(\)/);
+  assert.match(appSource, /async function toggleAnswerBreakthrough\(button\)[\s\S]*const saved = await saveCurrentJournalDraft\(\);[\s\S]*const result = await setAnswerBreakthrough/);
+  assert.match(appSource, /async function dropSelectedBreakthrough\(button\)[\s\S]*const saved = await saveCurrentJournalDraft\(\);[\s\S]*const result = await dropBreakthrough/);
 });
 
 test("today meal cards still exclude reflection controls", () => {
