@@ -4,6 +4,7 @@ import test from "node:test";
 
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
+const modelSource = await readFile(new URL("../public/scripts/journal-model.js", import.meta.url), "utf8");
 
 const journalRequiredCopy = [
   "Reflection",
@@ -35,7 +36,7 @@ const journalRequiredCopy = [
 ];
 
 test("journal surface exposes required Reflection and Breakthroughs copy", () => {
-  const source = `${html}\n${appSource}`;
+  const source = `${html}\n${appSource}\n${modelSource}`;
 
   for (const copy of journalRequiredCopy) {
     assert.match(source, new RegExp(escapeRegExp(copy)), `missing Journal copy: ${copy}`);
@@ -70,7 +71,7 @@ test("journal controller imports repository and wires load save breakthrough act
 
 test("journal dynamic rendering uses DOM nodes and scoped closest actions", () => {
   assert.match(appSource, /document\.createElement\("article"\)/);
-  assert.match(appSource, /setText\(.*answer\.text/);
+  assert.match(appSource, /textArea\.value = answer\?\.text \|\| ""/);
   assert.match(appSource, /setText\(.*breakthrough\.text/);
   assert.match(appSource, /button\.closest\("\[data-journal-answer-card\]"\)/);
   assert.match(appSource, /button\.closest\("\[data-breakthrough-card\]"\)/);

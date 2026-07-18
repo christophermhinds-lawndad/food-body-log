@@ -191,9 +191,53 @@
           <p>Numeric summaries arrive after daily entries exist.</p>
         </section>
 
-        <section class="view-panel" data-view="journal" hidden>
-          <h2>Journal &amp; Breakthroughs</h2>
-          <p>Evening reflection arrives after the daily tracking loop.</p>
+        <section class="view-panel journal-view" data-view="journal" hidden>
+          <section class="journal-section" aria-labelledby="journal-reflection-title">
+            <div>
+              <h2 id="journal-reflection-title">Reflection</h2>
+              <p id="journal-day" class="date-heading">Today</p>
+            </div>
+            <p id="journal-helper" class="note">Nothing extra to reflect on from today's meal answers. You can still write anything that feels useful.</p>
+            <form id="journal-form" class="stack-form">
+              <div id="journal-prompt-list" class="journal-prompt-list" aria-live="polite"></div>
+              <button class="primary-action compact-action" type="submit">Save reflection</button>
+              <p id="journal-message" class="status-message" aria-live="polite">Loading evening reflection...</p>
+            </form>
+          </section>
+
+          <section class="journal-section" aria-labelledby="breakthrough-title">
+            <h2 id="breakthrough-title">Breakthroughs</h2>
+            <div id="breakthrough-list" class="breakthrough-list" aria-live="polite"></div>
+            <p id="breakthrough-message" class="status-message" aria-live="polite"></p>
+          </section>
+
+          <template data-journal-prompt-template>
+            <article class="journal-prompt-card" data-journal-answer-card>
+              <label class="field-label" data-journal-prompt-label></label>
+              <textarea class="text-field journal-textarea" data-journal-answer-text rows="3"></textarea>
+              <fieldset class="journal-chip-group" data-journal-chip-group hidden>
+                <legend>Optional context</legend>
+                <div class="journal-chip-list" data-journal-chip-list></div>
+              </fieldset>
+              <label class="field-label" data-journal-detail-label hidden>Optional detail</label>
+              <textarea class="text-field journal-textarea" data-journal-detail-text rows="2" hidden></textarea>
+              <p class="breakthrough-state" data-breakthrough-state hidden>Marked as breakthrough</p>
+              <button class="secondary-action" type="button" data-toggle-breakthrough>Mark as breakthrough</button>
+            </article>
+          </template>
+
+          <template data-breakthrough-template>
+            <article class="breakthrough-card" data-breakthrough-card>
+              <p class="date-heading" data-breakthrough-day></p>
+              <h3 data-breakthrough-prompt></h3>
+              <p class="breakthrough-answer" data-breakthrough-answer></p>
+              <p class="breakthrough-chip-row" data-breakthrough-chips hidden></p>
+              <div class="button-row">
+                <button class="secondary-action" type="button" data-source-day>View source day</button>
+                <button class="secondary-action destructive-action" type="button" data-drop-breakthrough>Drop from breakthroughs</button>
+              </div>
+            </article>
+          </template>
         </section>
 
         <section class="view-panel" data-view="history" hidden>

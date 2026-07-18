@@ -6,6 +6,8 @@ import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
 import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=3";
 import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
+import { JOURNAL_CHIPS, BREAKTHROUGH_STATES } from "./journal-model.js?v=1";
+import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough } from "./journal-tracking.js?v=1";
 
 const appPaths = createAppPaths();
 
@@ -28,9 +30,28 @@ const weightMessage = document.querySelector("#weight-message");
 const todayDate = document.querySelector("#today-date");
 const planForm = document.querySelector("#plan-form");
 const planMessage = document.querySelector("#plan-message");
+const journalForm = document.querySelector("#journal-form");
+const journalPromptList = document.querySelector("#journal-prompt-list");
+const journalDay = document.querySelector("#journal-day");
+const journalHelper = document.querySelector("#journal-helper");
+const journalMessage = document.querySelector("#journal-message");
+const breakthroughList = document.querySelector("#breakthrough-list");
+const breakthroughMessage = document.querySelector("#breakthrough-message");
+const journalPromptTemplate = document.querySelector("[data-journal-prompt-template]");
+const breakthroughTemplate = document.querySelector("[data-breakthrough-template]");
 const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded. You can keep typing.";
+const JOURNAL_LOAD_MESSAGE = "Loading evening reflection...";
+const JOURNAL_UNAVAILABLE_MESSAGE = "Evening reflection could not be loaded. Reopen the app and try again.";
+const JOURNAL_SAVE_ERROR_MESSAGE = "Reflection could not be saved. Try again; data already saved on this device stays local.";
+const NO_EXTRA_PROMPTS_MESSAGE = "Nothing extra to reflect on from today's meal answers. You can still write anything that feels useful.";
+const MISSING_MEAL_DATA_MESSAGE = "Not all meals are logged yet. That is okay; only logged non-skipped No answers add extra prompts.";
+const SOURCE_DAY_MESSAGE = "Source-day navigation will open this day when History is available.";
+const DROP_SUCCESS_MESSAGE = "Breakthrough removed. The original answer stayed saved.";
 let todayDayID = getTodayDayID();
 let planDayID = getTomorrowDayID();
+let journalDayID = todayDayID;
+let journalLoadRequestID = 0;
+let currentJournalState = null;
 const planSuggestions = createPlanSuggestionController({
   document,
   getPlanSuggestions,
@@ -56,6 +77,11 @@ weightForm?.addEventListener("submit", (event) => {
 planForm?.addEventListener("submit", (event) => {
   event.preventDefault();
   saveSelectedPlan();
+});
+
+journalForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveJournalReflection();
 });
 
 document.querySelectorAll("[name='plan-day']").forEach((control) => {
@@ -113,6 +139,35 @@ document.querySelectorAll("[data-unskip-meal]").forEach((button) => {
   });
 });
 
+journalPromptList?.addEventListener("click", (event) => {
+  const button = event.target?.closest?.("[data-journal-chip], [data-toggle-breakthrough]");
+
+  if (!button) {
+    return;
+  }
+
+  if (button.matches("[data-journal-chip]")) {
+    toggleJournalChip(button);
+  }
+
+  if (button.matches("[data-toggle-breakthrough]")) {
+    toggleAnswerBreakthrough(button);
+  }
+});
+
+breakthroughList?.addEventListener("click", (event) => {
+  const sourceButton = event.target?.closest?.("[data-source-day]");
+  const dropButton = event.target?.closest?.("[data-drop-breakthrough]");
+
+  if (sourceButton) {
+    showSourceDayMessage(sourceButton);
+  }
+
+  if (dropButton) {
+    dropSelectedBreakthrough(dropButton);
+  }
+});
+
 registerServiceWorker();
 readStoredStatus();
 loadTodayView();
@@ -137,6 +192,10 @@ function selectTab(tabName) {
 
   if (tabName === "plan") {
     loadPlanView();
+  }
+
+  if (tabName === "journal") {
+    loadJournalView();
   }
 }
 
@@ -253,6 +312,119 @@ async function saveSelectedPlan() {
   }
 }
 
+async function loadJournalView() {
+  refreshCurrentDayIDs();
+  journalDayID = todayDayID;
+  const requestedDayID = journalDayID;
+  const requestID = journalLoadRequestID + 1;
+  journalLoadRequestID = requestID;
+  setJournalFormDisabled(true);
+  setText(journalDay, requestedDayID);
+  setText(journalMessage, JOURNAL_LOAD_MESSAGE);
+  setText(breakthroughMessage, "");
+  const state = await getJournalState(requestedDayID);
+
+  if (requestID !== journalLoadRequestID || requestedDayID !== journalDayID) {
+    return;
+  }
+
+  if (!state.available) {
+    setJournalFormDisabled(false);
+    setText(journalMessage, JOURNAL_UNAVAILABLE_MESSAGE);
+    renderBreakthroughs([]);
+    return;
+  }
+
+  renderJournalState(state);
+  setJournalFormDisabled(false);
+  setText(journalMessage, "");
+}
+
+async function saveJournalReflection() {
+  refreshCurrentDayIDs();
+  const selectedDayID = journalDayID || todayDayID;
+  setJournalFormDisabled(true);
+  const result = await saveReflection(selectedDayID, serializeJournalAnswers());
+
+  if (selectedDayID !== journalDayID) {
+    return;
+  }
+
+  setJournalFormDisabled(false);
+
+  if (!isReadyResult(result)) {
+    setText(journalMessage, JOURNAL_SAVE_ERROR_MESSAGE);
+    return;
+  }
+
+  renderJournalState(result);
+  setText(journalMessage, "Reflection saved.");
+}
+
+function serializeJournalAnswers() {
+  return Object.fromEntries(Array.from(document.querySelectorAll("[data-journal-answer-card]"))
+    .map((card) => {
+      const selectedChipIDs = Array.from(card.querySelectorAll("[data-journal-chip][aria-pressed='true']"))
+        .map((button) => button.dataset.journalChip);
+
+      return [card.dataset.promptId, {
+        text: card.querySelector("[data-journal-answer-text]")?.value || "",
+        selectedChipIDs,
+        detail: card.querySelector("[data-journal-detail-text]")?.value || "",
+      }];
+    }));
+}
+
+async function toggleAnswerBreakthrough(button) {
+  const card = button.closest("[data-journal-answer-card]");
+  const answerID = card?.dataset.answerId;
+  const isMarked = card?.dataset.breakthroughState === BREAKTHROUGH_STATES.marked;
+
+  if (!answerID) {
+    setText(journalMessage, "Save reflection before marking a breakthrough.");
+    return;
+  }
+
+  if (isMarked && !window.confirm("Remove breakthrough: Remove the breakthrough highlight? The original journal answer will stay saved.")) {
+    return;
+  }
+
+  const result = await setAnswerBreakthrough(answerID, !isMarked);
+
+  if (!isReadyResult(result)) {
+    setText(journalMessage, "Breakthrough could not be updated. Try again.");
+    return;
+  }
+
+  await loadJournalView();
+  setText(journalMessage, isMarked ? "Breakthrough highlight removed. The original answer stayed saved." : "Marked as breakthrough.");
+}
+
+async function dropSelectedBreakthrough(button) {
+  const card = button.closest("[data-breakthrough-card]");
+  const answerID = card?.dataset.answerId;
+
+  if (!answerID || !window.confirm("Drop breakthrough: Drop this breakthrough? The original journal answer will stay saved.")) {
+    return;
+  }
+
+  const result = await dropBreakthrough(answerID);
+
+  if (!isReadyResult(result)) {
+    setText(breakthroughMessage, "Breakthrough could not be removed. Try again.");
+    return;
+  }
+
+  await loadJournalView();
+  setText(breakthroughMessage, DROP_SUCCESS_MESSAGE);
+}
+
+function showSourceDayMessage(button) {
+  const card = button.closest("[data-breakthrough-card]");
+  const dayID = card?.dataset.dayId || journalDayID;
+  setText(breakthroughMessage, `${SOURCE_DAY_MESSAGE} Source day: ${dayID}.`);
+}
+
 async function saveTodayWeight() {
   refreshCurrentDayIDs();
   const result = await saveWeight(todayDayID, weightInput?.value || "");
@@ -350,6 +522,142 @@ function renderTodayState(state) {
   markTodayFocalState(state);
 }
 
+function renderJournalState(state) {
+  currentJournalState = state;
+  journalDayID = state.day?.dayID || journalDayID;
+  setText(journalDay, journalDayID);
+  renderJournalPrompts(state.prompts, state.answers);
+  renderJournalHelper(state);
+  renderBreakthroughs(state.breakthroughs);
+}
+
+function renderJournalPrompts(prompts, answers) {
+  replaceChildren(journalPromptList);
+  const answersByPrompt = new Map((answers || []).map((answer) => [answer.promptID, answer]));
+
+  for (const prompt of prompts || []) {
+    journalPromptList?.append(renderJournalPromptCard(prompt, answersByPrompt.get(prompt.id)));
+  }
+}
+
+function renderJournalPromptCard(prompt, answer = null) {
+  const fragment = journalPromptTemplate?.content?.firstElementChild?.cloneNode(true);
+  const card = fragment || document.createElement("article");
+  const textID = `journal-${prompt.id}-answer`;
+  const detailID = `journal-${prompt.id}-detail`;
+  const textArea = card.querySelector("[data-journal-answer-text]");
+  const label = card.querySelector("[data-journal-prompt-label]");
+  const chipGroup = card.querySelector("[data-journal-chip-group]");
+  const chipList = card.querySelector("[data-journal-chip-list]");
+  const detailLabel = card.querySelector("[data-journal-detail-label]");
+  const detailText = card.querySelector("[data-journal-detail-text]");
+  const stateNode = card.querySelector("[data-breakthrough-state]");
+  const button = card.querySelector("[data-toggle-breakthrough]");
+  const breakthroughState = answer?.breakthroughState || BREAKTHROUGH_STATES.none;
+
+  card.dataset.promptId = prompt.id;
+  card.dataset.answerId = answer?.id || "";
+  card.dataset.breakthroughState = breakthroughState;
+  setText(label, prompt.text);
+
+  if (label) {
+    label.setAttribute("for", textID);
+  }
+
+  if (textArea) {
+    textArea.id = textID;
+    textArea.value = answer?.text || "";
+  }
+
+  if (prompt.supportsChips) {
+    chipGroup.hidden = false;
+    renderJournalChips(chipList, answer?.selectedChips || []);
+  }
+
+  if (prompt.supportsDetail) {
+    detailLabel.hidden = false;
+    detailText.hidden = false;
+    detailLabel.setAttribute("for", detailID);
+    detailText.id = detailID;
+    detailText.value = answer?.detail || "";
+  }
+
+  if (breakthroughState === BREAKTHROUGH_STATES.marked) {
+    stateNode.hidden = false;
+    setText(stateNode, "Marked as breakthrough");
+    setText(button, "Remove breakthrough");
+  } else {
+    stateNode.hidden = true;
+    setText(button, "Mark as breakthrough");
+  }
+
+  return card;
+}
+
+function renderJournalChips(container, selectedChips) {
+  replaceChildren(container);
+  const selectedIDs = new Set(selectedChips.map((chip) => chip.id));
+
+  for (const chip of JOURNAL_CHIPS) {
+    const button = document.createElement("button");
+    const selected = selectedIDs.has(chip.id);
+    button.type = "button";
+    button.className = "secondary-action journal-chip";
+    button.dataset.journalChip = chip.id;
+    button.setAttribute("aria-pressed", String(selected));
+    setText(button, selected ? `✓ ${chip.label}` : chip.label);
+    container?.append(button);
+  }
+}
+
+function renderJournalHelper(state) {
+  const hasDeeperPrompt = (state.prompts || []).some((prompt) => prompt.id.startsWith("deeper-"));
+  const hasMissingMeal = (state.meals || []).some((meal) => meal.logState === MEAL_STATES.notLogged);
+  setText(journalHelper, hasMissingMeal ? MISSING_MEAL_DATA_MESSAGE : (hasDeeperPrompt ? "" : NO_EXTRA_PROMPTS_MESSAGE));
+}
+
+function renderBreakthroughs(breakthroughs) {
+  replaceChildren(breakthroughList);
+
+  if (!breakthroughs || breakthroughs.length === 0) {
+    const empty = document.createElement("article");
+    const heading = document.createElement("h3");
+    const copy = document.createElement("p");
+    empty.className = "breakthrough-card breakthrough-empty";
+    setText(heading, "No breakthroughs saved yet");
+    setText(copy, "Mark an answer as a breakthrough when something feels useful to remember.");
+    empty.append(heading, copy);
+    breakthroughList?.append(empty);
+    return;
+  }
+
+  for (const breakthrough of breakthroughs) {
+    breakthroughList?.append(renderBreakthroughCard(breakthrough));
+  }
+}
+
+function renderBreakthroughCard(breakthrough) {
+  const fragment = breakthroughTemplate?.content?.firstElementChild?.cloneNode(true);
+  const card = fragment || document.createElement("article");
+  const dayNode = card.querySelector("[data-breakthrough-day]");
+  const promptNode = card.querySelector("[data-breakthrough-prompt]");
+  const answerNode = card.querySelector("[data-breakthrough-answer]");
+  const chipNode = card.querySelector("[data-breakthrough-chips]");
+
+  card.dataset.answerId = breakthrough.id;
+  card.dataset.dayId = breakthrough.dayID;
+  setText(dayNode, breakthrough.dayID);
+  setText(promptNode, breakthrough.promptText);
+  setText(answerNode, breakthrough.text);
+
+  if (breakthrough.selectedChips?.length) {
+    chipNode.hidden = false;
+    setText(chipNode, breakthrough.selectedChips.map((chip) => chip.label).join(", "));
+  }
+
+  return card;
+}
+
 function renderMeal(meal) {
   const plannedTextNode = document.querySelector(`[data-planned-text="${meal.slot}"]`);
   const planEmptyCopy = document.querySelector(`[data-plan-empty-copy="${meal.slot}"]`);
@@ -414,6 +722,12 @@ function setPlanFormDisabled(disabled) {
   });
 }
 
+function setJournalFormDisabled(disabled) {
+  journalForm?.querySelectorAll("textarea, button").forEach((control) => {
+    control.disabled = disabled;
+  });
+}
+
 function isReadyResult(result) {
   return result?.available === true && result.status === "Ready";
 }
@@ -431,6 +745,21 @@ function mealMessageForCard(card) {
   }
 
   return card.querySelector("[data-meal-message]");
+}
+
+function toggleJournalChip(button) {
+  const selected = button.getAttribute("aria-pressed") === "true";
+  const chip = JOURNAL_CHIPS.find((candidate) => candidate.id === button.dataset.journalChip);
+  button.setAttribute("aria-pressed", String(!selected));
+  setText(button, !selected ? `✓ ${chip?.label || ""}` : chip?.label || "");
+}
+
+function replaceChildren(node, ...children) {
+  if (!node) {
+    return;
+  }
+
+  node.replaceChildren(...children);
 }
 
 function markTodayFocalState(state) {
