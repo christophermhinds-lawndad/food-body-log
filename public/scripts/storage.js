@@ -1,9 +1,10 @@
 const DB_NAME = "food-body-log";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const SETTINGS_STORE = "settings";
 const DAYS_STORE = "days";
 const MEALS_STORE = "meals";
 const WEIGHTS_STORE = "weights";
+const JOURNAL_ANSWERS_STORE = "journalAnswers";
 const SETUP_STATUS_KEY = "setup-status";
 const UNAVAILABLE = Object.freeze({
   available: false,
@@ -38,6 +39,12 @@ export function openAppDb() {
 
       if (!db.objectStoreNames.contains(WEIGHTS_STORE)) {
         db.createObjectStore(WEIGHTS_STORE, { keyPath: "dayID" });
+      }
+
+      if (!db.objectStoreNames.contains(JOURNAL_ANSWERS_STORE)) {
+        const journalAnswersStore = db.createObjectStore(JOURNAL_ANSWERS_STORE, { keyPath: "id" });
+        journalAnswersStore.createIndex("byDay", "dayID", { unique: false });
+        journalAnswersStore.createIndex("byBreakthrough", "breakthroughState", { unique: false });
       }
     };
 
