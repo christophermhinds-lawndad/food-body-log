@@ -42,7 +42,7 @@ test("service worker registration stays inside the app path and uses fixed same-
   assert.match(appSource, /import \{ createAppPaths \} from "\.\/paths\.js";/);
   assert.match(
     appSource,
-    /navigator\.serviceWorker\.register\(appPaths\.serviceWorkerScriptUrl\(\), \{\s*scope: appPaths\.serviceWorkerScope\(\),?\s*\}\)/s,
+    /navigator\.serviceWorker\.register\(appPaths\.serviceWorkerScriptUrl\(\), \{\s*scope: appPaths\.serviceWorkerScope\(\),\s*type: "module",?\s*\}\)/s,
   );
   assert.doesNotMatch(appSource, /serviceWorker\.register\(["'`]\.\/sw\.js/);
 });

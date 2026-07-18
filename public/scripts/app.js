@@ -53,6 +53,7 @@ async function registerServiceWorker() {
   try {
     await navigator.serviceWorker.register(appPaths.serviceWorkerScriptUrl(), {
       scope: appPaths.serviceWorkerScope(),
+      type: "module",
     });
   } catch {
     setStatusText(statusValueNodes.offlineCache, "Not ready");
