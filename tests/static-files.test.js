@@ -7,6 +7,7 @@ const repoRoot = new URL("..", import.meta.url);
 const publicRoot = new URL("../public/", import.meta.url);
 const readmePath = new URL("../README.md", import.meta.url);
 const staticHostingDocPath = new URL("../docs/static-hosting.md", import.meta.url);
+const iphoneUatDocPath = new URL("../docs/iphone-uat.md", import.meta.url);
 
 const requiredPublishFiles = [
   "index.html",
@@ -127,3 +128,38 @@ test("static hosting docs do not instruct package installs or backend setup", as
 function normalizeDoc(value) {
   return value.toLowerCase().replace(/\s+/g, " ");
 }
+
+test("iPhone UAT checklist covers install, offline, status, and update validation", async () => {
+  const doc = await readFile(iphoneUatDocPath, "utf8");
+  const normalized = normalizeDoc(doc);
+
+  const requiredSnippets = [
+    "iphone 13 safari",
+    "hosted https url",
+    "add to home screen",
+    "standalone relaunch",
+    "cache-ready settings status",
+    "airplane-mode launch",
+    "update/relaunch data preservation",
+    "indexeddb setup/status record",
+  ];
+
+  for (const snippet of requiredSnippets) {
+    assert.ok(normalized.includes(snippet), `missing iPhone UAT coverage: ${snippet}`);
+  }
+});
+
+test("iPhone UAT checklist records blocked status for missing device or hosted URL", async () => {
+  const doc = await readFile(iphoneUatDocPath, "utf8");
+  const normalized = normalizeDoc(doc);
+
+  assert.ok(normalized.includes("blocked"), "checklist must include a blocked result");
+  assert.ok(normalized.includes("no physical iphone 13 available"), "checklist must name missing device blocker");
+  assert.ok(normalized.includes("no hosted https static-host url available"), "checklist must name missing URL blocker");
+});
+
+test("iPhone UAT checklist avoids forbidden diet, shame, and scoring language", async () => {
+  const doc = await readFile(iphoneUatDocPath, "utf8");
+
+  assert.doesNotMatch(doc, /\b(diet|weight-loss|streak|score|scoring|calorie|macro|food grade|goal weight|shame|failure|advice)\b/i);
+});
