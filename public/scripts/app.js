@@ -140,8 +140,14 @@ async function checkInstallStatus() {
 
 async function loadTodayView() {
   refreshCurrentDayIDs();
+  const requestedDayID = todayDayID;
   setText(weightMessage, "Loading today's entries...");
   const state = await getTodayTrackingState();
+
+  if (state.available && (requestedDayID !== todayDayID || state.day.dayID !== getTodayDayID())) {
+    return;
+  }
+
   renderTodayState(state);
 }
 

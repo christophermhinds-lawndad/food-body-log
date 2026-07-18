@@ -92,6 +92,8 @@ test("today and plan storage paths refresh local day IDs before use", () => {
   assert.match(appSource, /todayDayID = getTodayDayID\(\);/);
   assert.match(appSource, /planDayID = selectedPlanDayID\(\);/);
   assert.match(appSource, /async function loadTodayView\(\) \{\n\s+refreshCurrentDayIDs\(\);/);
+  assert.match(appSource, /const requestedDayID = todayDayID;/);
+  assert.match(appSource, /state\.available && \(requestedDayID !== todayDayID \|\| state\.day\.dayID !== getTodayDayID\(\)\)/);
   assert.match(appSource, /async function loadPlanView\(\) \{\n\s+refreshCurrentDayIDs\(\);/);
   assert.match(appSource, /async function saveTodayWeight\(\) \{\n\s+refreshCurrentDayIDs\(\);/);
   assert.match(appSource, /async function saveMealFromForm\(form\) \{\n\s+refreshCurrentDayIDs\(\);/);
