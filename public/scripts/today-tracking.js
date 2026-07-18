@@ -38,20 +38,33 @@ export async function savePlan(dayID, plannedTextBySlot, options = {}) {
   return withDb(async (db) => {
     const day = await ensureDay(db, dayID, options);
     const meals = await ensureMealsForDay(db, dayID, options);
-    const updates = meals.map((meal) => ({
+    const changedMeals = meals.filter((meal) => hasPlannedTextForSlot(plannedTextBySlot, meal.slot));
+    const updatedAt = nowIso(options);
+    const updates = changedMeals.map((meal) => ({
       ...meal,
-      plannedText: hasPlannedTextForSlot(plannedTextBySlot, meal.slot)
-        ? normalizePlannedText(plannedTextBySlot[meal.slot])
-        : meal.plannedText,
-      updatedAt: nowIso(options),
+      plannedText: normalizePlannedText(plannedTextBySlot[meal.slot]),
+      updatedAt,
     }));
 
-    await putRecords(db, MEALS_STORE, updates);
+    try {
+      await putRecordsAtomically(db, MEALS_STORE, updates);
+    } catch {
+      return {
+        status: "Error",
+        day,
+        meals: await ensureMealsForDay(db, dayID, options),
+        weight: await getWeight(db, dayID),
+        error: {
+          code: "plan-save-failed",
+          dayID,
+        },
+      };
+    }
 
     return {
       status: "Ready",
       day,
-      meals: sortMeals(updates),
+      meals: await ensureMealsForDay(db, dayID, options),
       weight: await getWeight(db, dayID),
     };
   });
@@ -266,6 +279,33 @@ async function putRecords(db, storeName, records) {
   for (const record of records) {
     await putRecord(db, storeName, record);
   }
+}
+
+function putRecordsAtomically(db, storeName, records) {
+  if (records.length === 0) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, "readwrite");
+    const store = transaction.objectStore(storeName);
+    let requestError = null;
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(requestError || transaction.error);
+    transaction.onabort = () => reject(requestError || transaction.error);
+
+    try {
+      for (const record of records) {
+        const request = store.put(record);
+        request.onerror = () => {
+          requestError = request.error;
+        };
+      }
+    } catch (error) {
+      reject(error);
+    }
+  });
 }
 
 function getMealsByDay(db, dayID) {

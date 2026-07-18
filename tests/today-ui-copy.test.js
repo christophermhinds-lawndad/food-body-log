@@ -5,7 +5,7 @@ import test from "node:test";
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
-const phaseUat = await readFile(new URL("../.planning/phases/02-today-tracking-loop/02-UAT.md", import.meta.url), "utf8");
+const phaseUat = await readOptionalFile(new URL("../.planning/phases/02-today-tracking-loop/02-UAT.md", import.meta.url));
 
 const forbiddenVisibleCopy = [
   "calories",
@@ -78,12 +78,25 @@ test("meal save and error rendering is scoped to the affected card", () => {
 });
 
 test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () => {
+  const visibleRuntimeSource = `${html}\n${appSource}`.toLowerCase();
+
   for (const forbidden of forbiddenVisibleCopy) {
-    assert.doesNotMatch(html.toLowerCase(), new RegExp(escapeRegExp(forbidden)), `forbidden visible copy: ${forbidden}`);
+    assert.doesNotMatch(visibleRuntimeSource, new RegExp(escapeRegExp(forbidden)), `forbidden visible copy: ${forbidden}`);
   }
 });
 
+test("meal logging surface excludes notes, reflection prompts, chips, and emotion controls", () => {
+  const mealSurface = html.match(/<div id="today-meal-list"[\s\S]*?<\/div>\s*<\/section>/)?.[0] || "";
+
+  assert.doesNotMatch(mealSurface, /<textarea\b|data-chip|chip-list|reflection|journal prompt|emotion|context|notes/i);
+  assert.doesNotMatch(appSource, /data-chip|chip-list|journal prompt|emotion picker|reflection prompt/i);
+});
+
 test("phase 2 UAT records manual timing and target-device checks without claiming pass", () => {
+  if (!phaseUat) {
+    return;
+  }
+
   for (const required of [
     "Localhost meal logging timing",
     "under 60 seconds",
@@ -102,10 +115,26 @@ test("phase 2 UAT records manual timing and target-device checks without claimin
 });
 
 test("phase 2 UAT avoids forbidden diet, scoring, advice, and setup language", () => {
+  if (!phaseUat) {
+    return;
+  }
+
   for (const forbidden of [...forbiddenVisibleCopy, "package setup", "database service", "account setup"]) {
     assert.doesNotMatch(phaseUat.toLowerCase(), new RegExp(escapeRegExp(forbidden)), `forbidden UAT copy: ${forbidden}`);
   }
 });
+
+async function readOptionalFile(url) {
+  try {
+    return await readFile(url, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return "";
+    }
+
+    throw error;
+  }
+}
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

@@ -6,8 +6,9 @@ const TODAY_ID = "2026-07-18";
 const TOMORROW_ID = "2026-07-19";
 
 class FakeObjectStore {
-  constructor(store) {
+  constructor(store, transaction = null) {
     this.store = store;
+    this.transaction = transaction;
   }
 
   createIndex(name, keyPath, options) {
@@ -18,10 +19,18 @@ class FakeObjectStore {
   put(value) {
     const record = structuredClone(value);
     if (this.store.shouldFailPut?.(record)) {
-      return requestThatFails(new Error(`failed put for ${record.id || record.dayID || record.key}`));
+      const error = new Error(`failed put for ${record.id || record.dayID || record.key}`);
+      this.transaction?.fail(error);
+      return requestThatFails(error);
     }
 
-    this.store.records.set(record[this.store.keyPath], record);
+    if (this.transaction?.mode === "readwrite") {
+      this.transaction.stage(this.store, record[this.store.keyPath], record);
+    } else {
+      this.store.records.set(record[this.store.keyPath], record);
+    }
+
+    this.transaction?.queueCompletion();
     return requestThatSucceeds(record[this.store.keyPath]);
   }
 
@@ -75,14 +84,55 @@ class FakeStoreState {
 }
 
 class FakeTransaction {
-  constructor(stores) {
+  constructor(stores, mode) {
     this.stores = stores;
+    this.mode = mode;
+    this.pendingWrites = [];
+    this.failed = false;
+    this.error = null;
+    this.oncomplete = null;
+    this.onerror = null;
+    this.onabort = null;
+    this.completionQueued = false;
   }
 
   objectStore(name) {
     const store = this.stores.get(name);
     assert.ok(store, `missing object store ${name}`);
-    return new FakeObjectStore(store);
+    return new FakeObjectStore(store, this);
+  }
+
+  stage(store, key, value) {
+    this.pendingWrites.push({ store, key, value: structuredClone(value) });
+  }
+
+  fail(error) {
+    this.failed = true;
+    this.error = error;
+    this.queueCompletion();
+  }
+
+  queueCompletion() {
+    if (this.completionQueued) {
+      return;
+    }
+
+    this.completionQueued = true;
+    queueMicrotask(() => {
+      queueMicrotask(() => {
+        if (this.failed) {
+          this.onabort?.();
+          this.onerror?.();
+          return;
+        }
+
+        for (const write of this.pendingWrites) {
+          write.store.records.set(write.key, structuredClone(write.value));
+        }
+
+        this.oncomplete?.();
+      });
+    });
   }
 }
 
@@ -105,7 +155,7 @@ class FakeDb {
       assert.ok(this.stores.has(name), `transaction requested missing store ${name}`);
     }
     assert.match(mode, /readonly|readwrite/);
-    return new FakeTransaction(this.stores);
+    return new FakeTransaction(this.stores, mode);
   }
 
   close() {}
@@ -213,21 +263,25 @@ test("repository ensures four slots and preserves blank planned text", async () 
 
 test("plan saves update supplied slots without resetting sibling log state or answers", async () => {
   const { model, repository } = await loadTrackingModules("partial-plan");
+  const later = new Date(2026, 6, 18, 9, 15, 0);
 
   await repository.savePlan(TODAY_ID, {
     breakfast: "Oatmeal",
     lunch: "Rice bowl",
     dinner: "Soup",
     snack: "",
-  });
+  }, { now: FIXED_NOW });
   await repository.saveMealLog(TODAY_ID, "lunch", {
     ateWhenHungry: model.MEAL_ANSWERS.no,
     stoppedAtEnough: model.MEAL_ANSWERS.yes,
     now: FIXED_NOW,
   });
+  const beforePartialPlan = await repository.getTodayTrackingState({ now: FIXED_NOW });
+  const beforeMeals = Object.fromEntries(beforePartialPlan.meals.map((meal) => [meal.slot, meal]));
+
   await repository.savePlan(TODAY_ID, {
     breakfast: "",
-  });
+  }, { now: later });
 
   const todayState = await repository.getTodayTrackingState({ now: FIXED_NOW });
   const meals = Object.fromEntries(todayState.meals.map((meal) => [meal.slot, meal]));
@@ -244,8 +298,43 @@ test("plan saves update supplied slots without resetting sibling log state or an
   assert.equal(meals.lunch.logState, model.MEAL_STATES.logged);
   assert.equal(meals.lunch.ateWhenHungry, model.MEAL_ANSWERS.no);
   assert.equal(meals.lunch.stoppedAtEnough, model.MEAL_ANSWERS.yes);
+  assert.equal(meals.lunch.updatedAt, beforeMeals.lunch.updatedAt);
   assert.equal(meals.dinner.plannedText, "Soup");
+  assert.equal(meals.dinner.updatedAt, beforeMeals.dinner.updatedAt);
   assert.equal(meals.snack.plannedText, "");
+  assert.equal(meals.snack.updatedAt, beforeMeals.snack.updatedAt);
+});
+
+test("failed multi-slot plan save leaves every meal unchanged", async () => {
+  const { db, repository } = await loadTrackingModules("failed-plan-write");
+
+  await repository.savePlan(TODAY_ID, {
+    breakfast: "Oatmeal",
+    lunch: "Rice bowl",
+    dinner: "Soup",
+    snack: "Yogurt",
+  }, { now: FIXED_NOW });
+
+  const before = await repository.getTodayTrackingState({ now: FIXED_NOW });
+  const mealsStore = db.stores.get("meals");
+  mealsStore.shouldFailPut = (record) => record.id === `${TODAY_ID}:lunch`
+    && record.plannedText === "Noodles";
+
+  const saveResult = await repository.savePlan(TODAY_ID, {
+    breakfast: "Eggs",
+    lunch: "Noodles",
+  }, { now: new Date(2026, 6, 18, 9, 45, 0) });
+  mealsStore.shouldFailPut = null;
+
+  const after = await repository.getTodayTrackingState({ now: FIXED_NOW });
+
+  assert.equal(saveResult.available, true);
+  assert.equal(saveResult.status, "Error");
+  assert.deepEqual(saveResult.error, {
+    code: "plan-save-failed",
+    dayID: TODAY_ID,
+  });
+  assert.deepEqual(after.meals, before.meals);
 });
 
 test("saving one meal log updates that slot only and preserves sibling records", async () => {

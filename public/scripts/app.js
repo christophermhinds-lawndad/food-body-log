@@ -145,10 +145,17 @@ async function loadTodayView() {
 }
 
 async function loadPlanView() {
+  const requestedDayID = planDayID;
+  setPlanFormDisabled(true);
   setText(planMessage, "Loading plan...");
-  const state = await getPlanState(planDayID);
+  const state = await getPlanState(requestedDayID);
+
+  if (requestedDayID !== planDayID) {
+    return;
+  }
 
   if (!state.available) {
+    setPlanFormDisabled(false);
     setText(planMessage, "Plan could not be loaded. Try again.");
     return;
   }
@@ -160,6 +167,7 @@ async function loadPlanView() {
     }
   }
 
+  setPlanFormDisabled(false);
   setText(planMessage, "");
 }
 
@@ -298,6 +306,12 @@ function selectedMetricValue(form, name) {
 function setMetricValue(form, name, value) {
   form?.querySelectorAll(`[name="${name}"]`).forEach((input) => {
     input.checked = input.value === value;
+  });
+}
+
+function setPlanFormDisabled(disabled) {
+  planForm?.querySelectorAll("input, button").forEach((control) => {
+    control.disabled = disabled;
   });
 }
 
