@@ -172,19 +172,27 @@ async function loadPlanView() {
 }
 
 async function saveSelectedPlan() {
+  const selectedDayID = planDayID;
+  setPlanFormDisabled(true);
   const plannedTextBySlot = Object.fromEntries(
     Array.from(document.querySelectorAll("[data-plan-slot]")).map((input) => [input.dataset.planSlot, input.value]),
   );
-  const result = await savePlan(planDayID, plannedTextBySlot);
+  const result = await savePlan(selectedDayID, plannedTextBySlot);
 
-  if (!result.available) {
+  if (selectedDayID !== planDayID) {
+    return;
+  }
+
+  setPlanFormDisabled(false);
+
+  if (!isReadyResult(result)) {
     setText(planMessage, "Plan could not be saved. Try again.");
     return;
   }
 
   setText(planMessage, "Plan saved.");
 
-  if (planDayID === todayDayID) {
+  if (selectedDayID === todayDayID && result.day.dayID === todayDayID) {
     renderTodayState(result);
   }
 }
@@ -192,7 +200,7 @@ async function saveSelectedPlan() {
 async function saveTodayWeight() {
   const result = await saveWeight(todayDayID, weightInput?.value || "");
 
-  if (!result.available) {
+  if (!isReadyResult(result)) {
     setText(weightMessage, result.status === "Invalid" ? "Enter a positive weight value before saving." : "Weight could not be saved. Try again.");
     return;
   }
@@ -218,7 +226,7 @@ async function saveMealFromForm(form) {
     stoppedAtEnough,
   });
 
-  if (!result.available) {
+  if (!isReadyResult(result)) {
     setText(message, "Meal log could not be saved. Try again.");
     return;
   }
@@ -234,7 +242,7 @@ async function skipSelectedMeal(button) {
   const slot = card?.dataset.slot || button.dataset.skipMeal;
   const result = await skipMeal(todayDayID, slot);
 
-  if (!result.available) {
+  if (!isReadyResult(result)) {
     setText(message, "Meal log could not be saved. Try again.");
     return;
   }
@@ -313,6 +321,10 @@ function setPlanFormDisabled(disabled) {
   planForm?.querySelectorAll("input, button").forEach((control) => {
     control.disabled = disabled;
   });
+}
+
+function isReadyResult(result) {
+  return result?.available === true && result.status === "Ready";
 }
 
 function renderAffectedMeal(state, slot) {

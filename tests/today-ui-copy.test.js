@@ -77,6 +77,16 @@ test("meal save and error rendering is scoped to the affected card", () => {
   assert.doesNotMatch(appSource, /document\.querySelector\(`\[data-meal-message="\$\{slot\}"\]`\)/);
 });
 
+test("save success paths require Ready status and guard stale plan days", () => {
+  assert.match(appSource, /function isReadyResult\(result\)/);
+  assert.match(appSource, /result\?\.available === true && result\.status === "Ready"/);
+  assert.match(appSource, /const selectedDayID = planDayID;/);
+  assert.match(appSource, /savePlan\(selectedDayID, plannedTextBySlot\)/);
+  assert.match(appSource, /if \(selectedDayID !== planDayID\)/);
+  assert.match(appSource, /selectedDayID === todayDayID && result\.day\.dayID === todayDayID/);
+  assert.match(appSource, /if \(!isReadyResult\(result\)\)/);
+});
+
 test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () => {
   const visibleRuntimeSource = `${html}\n${appSource}`.toLowerCase();
 
