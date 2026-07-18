@@ -80,11 +80,22 @@ test("meal save and error rendering is scoped to the affected card", () => {
 test("save success paths require Ready status and guard stale plan days", () => {
   assert.match(appSource, /function isReadyResult\(result\)/);
   assert.match(appSource, /result\?\.available === true && result\.status === "Ready"/);
-  assert.match(appSource, /const selectedDayID = planDayID;/);
+  assert.match(appSource, /refreshCurrentDayIDs\(\);\n\s+const selectedDayID = planDayID;/);
   assert.match(appSource, /savePlan\(selectedDayID, plannedTextBySlot\)/);
   assert.match(appSource, /if \(selectedDayID !== planDayID\)/);
   assert.match(appSource, /selectedDayID === todayDayID && result\.day\.dayID === todayDayID/);
   assert.match(appSource, /if \(!isReadyResult\(result\)\)/);
+});
+
+test("today and plan storage paths refresh local day IDs before use", () => {
+  assert.match(appSource, /function refreshCurrentDayIDs\(\)/);
+  assert.match(appSource, /todayDayID = getTodayDayID\(\);/);
+  assert.match(appSource, /planDayID = selectedPlanDayID\(\);/);
+  assert.match(appSource, /async function loadTodayView\(\) \{\n\s+refreshCurrentDayIDs\(\);/);
+  assert.match(appSource, /async function loadPlanView\(\) \{\n\s+refreshCurrentDayIDs\(\);/);
+  assert.match(appSource, /async function saveTodayWeight\(\) \{\n\s+refreshCurrentDayIDs\(\);/);
+  assert.match(appSource, /async function saveMealFromForm\(form\) \{\n\s+refreshCurrentDayIDs\(\);/);
+  assert.match(appSource, /async function skipSelectedMeal\(button\) \{\n\s+refreshCurrentDayIDs\(\);/);
 });
 
 test("forbidden diet, scoring, goal, advice, and moralized copy is absent", () => {

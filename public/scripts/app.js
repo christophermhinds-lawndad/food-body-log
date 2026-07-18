@@ -139,12 +139,14 @@ async function checkInstallStatus() {
 }
 
 async function loadTodayView() {
+  refreshCurrentDayIDs();
   setText(weightMessage, "Loading today's entries...");
   const state = await getTodayTrackingState();
   renderTodayState(state);
 }
 
 async function loadPlanView() {
+  refreshCurrentDayIDs();
   const requestedDayID = planDayID;
   setPlanFormDisabled(true);
   setText(planMessage, "Loading plan...");
@@ -172,6 +174,7 @@ async function loadPlanView() {
 }
 
 async function saveSelectedPlan() {
+  refreshCurrentDayIDs();
   const selectedDayID = planDayID;
   setPlanFormDisabled(true);
   const plannedTextBySlot = Object.fromEntries(
@@ -198,6 +201,7 @@ async function saveSelectedPlan() {
 }
 
 async function saveTodayWeight() {
+  refreshCurrentDayIDs();
   const result = await saveWeight(todayDayID, weightInput?.value || "");
 
   if (!isReadyResult(result)) {
@@ -210,6 +214,7 @@ async function saveTodayWeight() {
 }
 
 async function saveMealFromForm(form) {
+  refreshCurrentDayIDs();
   const card = form.closest("[data-meal-card]");
   const message = mealMessageForCard(card);
   const slot = card?.dataset.slot || form.dataset.slot;
@@ -237,6 +242,7 @@ async function saveMealFromForm(form) {
 }
 
 async function skipSelectedMeal(button) {
+  refreshCurrentDayIDs();
   const card = button.closest("[data-meal-card]");
   const message = mealMessageForCard(card);
   const slot = card?.dataset.slot || button.dataset.skipMeal;
@@ -304,6 +310,11 @@ function renderMeal(meal) {
 function selectedPlanDayID() {
   const selected = document.querySelector("[name='plan-day']:checked")?.value;
   return selected === "today" ? getTodayDayID() : getTomorrowDayID();
+}
+
+function refreshCurrentDayIDs() {
+  todayDayID = getTodayDayID();
+  planDayID = selectedPlanDayID();
 }
 
 function selectedMetricValue(form, name) {
