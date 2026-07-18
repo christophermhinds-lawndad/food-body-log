@@ -170,7 +170,8 @@
           </fieldset>
           <form id="plan-form" class="stack-form">
             <label class="field-label" for="plan-breakfast">Breakfast</label>
-            <input id="plan-breakfast" class="text-field" type="text" autocomplete="off" data-plan-slot="breakfast">
+            <input id="plan-breakfast" class="text-field" type="text" autocomplete="off" data-plan-slot="breakfast" aria-controls="plan-breakfast-suggestions" aria-expanded="false">
+            <div id="plan-breakfast-suggestions" class="plan-suggestions" data-plan-suggestions="breakfast" hidden></div>
             <label class="field-label" for="plan-lunch">Lunch</label>
             <input id="plan-lunch" class="text-field" type="text" autocomplete="off" data-plan-slot="lunch">
             <label class="field-label" for="plan-dinner">Dinner</label>

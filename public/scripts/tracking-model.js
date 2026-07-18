@@ -86,6 +86,53 @@ export function normalizePlannedText(value) {
   return String(value ?? "").trim();
 }
 
+export function normalizedPlannedTextWords(value) {
+  return normalizePlannedText(value).toLowerCase().match(/[a-z0-9]+/g) || [];
+}
+
+export function rankPlannedTextSuggestions(query, meals, options = {}) {
+  const limit = Number.isInteger(options.limit) && options.limit > 0 ? options.limit : 3;
+  const queryWords = new Set(normalizedPlannedTextWords(query));
+
+  if (queryWords.size === 0) {
+    return [];
+  }
+
+  const seenTexts = new Set();
+  const candidates = [];
+
+  for (const meal of Array.isArray(meals) ? meals : []) {
+    const text = normalizePlannedText(meal?.plannedText);
+    const normalizedKey = normalizedPlannedTextWords(text).join(" ");
+
+    if (!text || !normalizedKey || seenTexts.has(normalizedKey)) {
+      continue;
+    }
+
+    seenTexts.add(normalizedKey);
+    const words = new Set(normalizedPlannedTextWords(text));
+    const sharedWordCount = Array.from(queryWords).filter((word) => words.has(word)).length;
+
+    if (sharedWordCount === 0) {
+      continue;
+    }
+
+    candidates.push({
+      text,
+      sharedWordCount,
+      updatedAt: meal?.updatedAt || "",
+      firstSeen: candidates.length,
+    });
+  }
+
+  return candidates
+    .sort((left, right) => right.sharedWordCount - left.sharedWordCount
+      || right.updatedAt.localeCompare(left.updatedAt)
+      || left.firstSeen - right.firstSeen)
+    .slice(0, limit)
+    .map((candidate) => candidate.text);
+}
+
 export function normalizeWeightValue(value) {
   const numericValue = typeof value === "number" ? value : Number.parseFloat(String(value ?? "").trim());
 

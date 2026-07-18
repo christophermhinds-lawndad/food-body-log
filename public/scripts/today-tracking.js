@@ -9,6 +9,7 @@ import {
   mealID,
   normalizePlannedText,
   normalizeWeightValue,
+  rankPlannedTextSuggestions,
 } from "./tracking-model.js?v=3";
 import { openAppDb } from "./storage.js";
 
@@ -33,6 +34,15 @@ export async function getPlanState(dayIDOrOptions = {}) {
   const dayID = typeof dayIDOrOptions === "string" ? dayIDOrOptions : getTomorrowDayID(dayIDOrOptions);
 
   return readDayState(dayID, typeof dayIDOrOptions === "string" ? {} : dayIDOrOptions);
+}
+
+export async function getPlanSuggestions(query, options = {}) {
+  return withDb(async (db) => ({
+    status: "Ready",
+    suggestions: rankPlannedTextSuggestions(query, await getAllMeals(db), options),
+  }), {
+    suggestions: [],
+  });
 }
 
 export async function savePlan(dayID, plannedTextBySlot, options = {}) {
@@ -208,12 +218,12 @@ async function readDayState(dayID, options = {}) {
   });
 }
 
-async function withDb(callback) {
+async function withDb(callback, unavailableExtras = {}) {
   try {
     const db = await openAppDb();
 
     if (!db) {
-      return { ...UNAVAILABLE };
+      return { ...UNAVAILABLE, ...unavailableExtras };
     }
 
     try {
@@ -226,7 +236,7 @@ async function withDb(callback) {
       db.close?.();
     }
   } catch {
-    return { ...UNAVAILABLE };
+    return { ...UNAVAILABLE, ...unavailableExtras };
   }
 }
 
@@ -339,6 +349,15 @@ function getMealsByDay(db, dayID) {
       const records = Array.isArray(request.result) ? request.result : [];
       resolve(records.filter((meal) => meal.dayID === dayID));
     };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function getAllMeals(db) {
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(MEALS_STORE, "readonly").objectStore(MEALS_STORE).getAll();
+
+    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
     request.onerror = () => reject(request.error);
   });
 }

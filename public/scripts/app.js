@@ -4,7 +4,7 @@ import { renderStatusRows, setStatusText, setText } from "./dom.js";
 import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=3";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
-import { getPlanState, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=3";
+import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=3";
 
 const appPaths = createAppPaths();
 
@@ -29,6 +29,7 @@ const planForm = document.querySelector("#plan-form");
 const planMessage = document.querySelector("#plan-message");
 let todayDayID = getTodayDayID();
 let planDayID = getTomorrowDayID();
+let planSuggestionRequestID = 0;
 
 document.querySelectorAll("[data-tab]").forEach((button) => {
   button.addEventListener("click", () => selectTab(button.dataset.tab));
@@ -51,8 +52,18 @@ planForm?.addEventListener("submit", (event) => {
 document.querySelectorAll("[name='plan-day']").forEach((control) => {
   control.addEventListener("change", () => {
     planDayID = selectedPlanDayID();
+    hideAllPlanSuggestions();
     loadPlanView();
   });
+});
+
+document.querySelectorAll("[data-plan-slot]").forEach((input) => {
+  if (input.dataset.planSlot !== "breakfast") {
+    return;
+  }
+
+  input.addEventListener("input", () => updatePlanSuggestions(input));
+  input.addEventListener("focus", () => updatePlanSuggestions(input));
 });
 
 document.querySelectorAll("[data-meal-form]").forEach((form) => {
@@ -160,6 +171,7 @@ async function loadTodayView() {
 async function loadPlanView() {
   refreshCurrentDayIDs();
   const requestedDayID = planDayID;
+  hideAllPlanSuggestions();
   setPlanFormDisabled(true);
   setText(planMessage, "Loading plan...");
   const state = await getPlanState(requestedDayID);
@@ -188,6 +200,7 @@ async function loadPlanView() {
 async function saveSelectedPlan() {
   refreshCurrentDayIDs();
   const selectedDayID = planDayID;
+  hideAllPlanSuggestions();
   setPlanFormDisabled(true);
   const plannedTextBySlot = Object.fromEntries(
     Array.from(document.querySelectorAll("[data-plan-slot]")).map((input) => [input.dataset.planSlot, input.value]),
@@ -210,6 +223,93 @@ async function saveSelectedPlan() {
   if (selectedDayID === todayDayID && result.day.dayID === todayDayID) {
     renderTodayState(result);
   }
+}
+
+async function updatePlanSuggestions(input) {
+  const slot = input?.dataset.planSlot;
+  const query = input?.value || "";
+  const requestedDayID = planDayID;
+  const requestID = ++planSuggestionRequestID;
+
+  if (!slot || !query.trim()) {
+    hidePlanSuggestions(input);
+    return;
+  }
+
+  const result = await getPlanSuggestions(query);
+
+  if (requestID !== planSuggestionRequestID || requestedDayID !== planDayID || document.activeElement !== input) {
+    return;
+  }
+
+  if (!isReadyResult(result)) {
+    hidePlanSuggestions(input);
+    return;
+  }
+
+  renderPlanSuggestions(input, result.suggestions);
+}
+
+function renderPlanSuggestions(input, suggestions) {
+  const list = planSuggestionList(input);
+
+  if (!list || !Array.isArray(suggestions) || suggestions.length === 0) {
+    hidePlanSuggestions(input);
+    return;
+  }
+
+  hideAllPlanSuggestions(input);
+  list.replaceChildren();
+  for (const suggestion of suggestions) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "plan-suggestion-option";
+    setText(button, suggestion);
+    button.addEventListener("click", () => applyPlanSuggestion(input, suggestion));
+    list.append(button);
+  }
+
+  list.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+}
+
+function hidePlanSuggestions(inputOrSlot) {
+  const list = planSuggestionList(inputOrSlot);
+  const input = typeof inputOrSlot === "string"
+    ? document.querySelector(`[data-plan-slot="${inputOrSlot}"]`)
+    : inputOrSlot;
+
+  if (list) {
+    list.replaceChildren();
+    list.hidden = true;
+  }
+
+  input?.setAttribute("aria-expanded", "false");
+}
+
+function hideAllPlanSuggestions(exceptInput = null) {
+  document.querySelectorAll("[data-plan-suggestions]").forEach((list) => {
+    if (exceptInput?.dataset.planSlot === list.dataset.planSuggestions) {
+      return;
+    }
+
+    hidePlanSuggestions(list.dataset.planSuggestions);
+  });
+}
+
+function applyPlanSuggestion(input, suggestionText) {
+  if (!input?.isConnected) {
+    return;
+  }
+
+  input.value = suggestionText;
+  hidePlanSuggestions(input);
+  input.focus({ preventScroll: true });
+}
+
+function planSuggestionList(inputOrSlot) {
+  const slot = typeof inputOrSlot === "string" ? inputOrSlot : inputOrSlot?.dataset.planSlot;
+  return slot ? document.querySelector(`[data-plan-suggestions="${slot}"]`) : null;
 }
 
 async function saveTodayWeight() {
