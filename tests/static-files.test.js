@@ -5,6 +5,8 @@ import test from "node:test";
 
 const repoRoot = new URL("..", import.meta.url);
 const publicRoot = new URL("../public/", import.meta.url);
+const readmePath = new URL("../README.md", import.meta.url);
+const staticHostingDocPath = new URL("../docs/static-hosting.md", import.meta.url);
 
 const requiredPublishFiles = [
   "index.html",
@@ -80,3 +82,45 @@ test("static publish does not require package, env, backend, or server route art
     assert.equal(exists, false, `${relativePath} must not be required for static publish`);
   }
 });
+
+test("README documents public publish directory and local static server command", async () => {
+  const readme = await readFile(readmePath, "utf8");
+
+  assert.match(readme, /`public\/` is the publish directory/);
+  assert.match(readme, /python3 -m http\.server 4173 --directory public/);
+});
+
+test("static hosting docs cover static-only root and project-subpath deployment", async () => {
+  const doc = await readFile(staticHostingDocPath, "utf8");
+  const normalized = normalizeDoc(doc);
+
+  const requiredSnippets = [
+    "root domain",
+    "project subpath",
+    "https install url",
+    "no build command",
+    "no server functions",
+    "no secrets",
+    "no app-user accounts",
+    "no database service",
+  ];
+
+  for (const snippet of requiredSnippets) {
+    assert.ok(normalized.includes(snippet), `missing static hosting coverage: ${snippet}`);
+  }
+});
+
+test("static hosting docs do not instruct package installs or backend setup", async () => {
+  const docs = [
+    await readFile(readmePath, "utf8"),
+    await readFile(staticHostingDocPath, "utf8"),
+  ].join("\n");
+
+  assert.doesNotMatch(docs, /\b(npm|pnpm|yarn|pip|brew|cargo)\s+(install|add)\b/i);
+  assert.doesNotMatch(docs, /\b(create|configure|set up|setup)\s+(a\s+)?(backend|api server|database|server function|cloud function)\b/i);
+  assert.doesNotMatch(docs, /\b(secret|environment variable|env var|analytics project|native ios project|xcode|app store|apple developer program)\b/i);
+});
+
+function normalizeDoc(value) {
+  return value.toLowerCase().replace(/\s+/g, " ");
+}
