@@ -119,6 +119,25 @@ test("storage adapter opens version 2 settings and daily tracking stores", async
   assert.ok(db.stores.get("meals").indexes.has("byDaySlot"));
 });
 
+test("storage upgrade preserves existing settings store while adding daily stores", async () => {
+  const db = installFakeIndexedDb();
+  db.createObjectStore("settings", { keyPath: "key" });
+  db.stores.get("settings").records.set("setup-status", {
+    key: "setup-status",
+    storage: "Ready before upgrade",
+    checkedAt: "2026-07-18T03:00:00.000Z",
+  });
+
+  const storage = await import(`../public/scripts/storage.js?preserve=${Date.now()}`);
+  const readBeforeWrite = await storage.readSetupStatus();
+
+  assert.equal(readBeforeWrite.available, true);
+  assert.equal(readBeforeWrite.value.storage, "Ready before upgrade");
+  assert.deepEqual(Array.from(db.stores.keys()).sort(), ["days", "meals", "settings", "weights"]);
+  assert.equal(db.stores.get("settings").records.size, 1);
+  assert.equal(db.stores.get("meals").indexes.get("byDaySlot").options.unique, true);
+});
+
 test("setup status writes update one stable settings record", async () => {
   installFakeIndexedDb();
   const storage = await import(`../public/scripts/storage.js?idempotent=${Date.now()}`);

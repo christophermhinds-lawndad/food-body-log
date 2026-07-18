@@ -17,6 +17,10 @@ class FakeObjectStore {
 
   put(value) {
     const record = structuredClone(value);
+    if (this.store.shouldFailPut?.(record)) {
+      return requestThatFails(new Error(`failed put for ${record.id || record.dayID || record.key}`));
+    }
+
     this.store.records.set(record[this.store.keyPath], record);
     return requestThatSucceeds(record[this.store.keyPath]);
   }
@@ -66,6 +70,7 @@ class FakeStoreState {
     this.keyPath = keyPath;
     this.records = new Map();
     this.indexes = new Map();
+    this.shouldFailPut = null;
   }
 }
 
@@ -122,11 +127,19 @@ function installFakeIndexedDb() {
       return request;
     },
   };
+
+  return db;
 }
 
 function requestThatSucceeds(result) {
   const request = { result, error: null };
   queueMicrotask(() => request.onsuccess?.());
+  return request;
+}
+
+function requestThatFails(error) {
+  const request = { result: undefined, error };
+  queueMicrotask(() => request.onerror?.());
   return request;
 }
 
@@ -139,12 +152,12 @@ function keyMatches(value, expected) {
 }
 
 async function loadTrackingModules(suffix) {
-  installFakeIndexedDb();
+  const db = installFakeIndexedDb();
 
   const model = await import(`../public/scripts/tracking-model.js?${suffix}`);
   const repository = await import(`../public/scripts/today-tracking.js?${suffix}`);
 
-  return { model, repository };
+  return { db, model, repository };
 }
 
 test("tracking model keeps fixed slots and state values distinct", async () => {
@@ -305,6 +318,47 @@ test("partial non-skipped meal answers return an affected-slot failure without p
   assert.equal(meals.lunch.plannedText, "Rice bowl");
   assert.equal(meals.dinner.plannedText, "Soup");
   assert.equal(meals.snack.plannedText, "Yogurt");
+});
+
+test("failed single-meal write reports the affected slot and preserves sibling records", async () => {
+  const { db, model, repository } = await loadTrackingModules("failed-meal-write");
+
+  await repository.savePlan(TODAY_ID, {
+    breakfast: "Oatmeal",
+    lunch: "Rice bowl",
+    dinner: "Soup",
+    snack: "Yogurt",
+  });
+
+  const mealsStore = db.stores.get("meals");
+  mealsStore.shouldFailPut = (record) => record.id === `${TODAY_ID}:lunch`
+    && record.logState === model.MEAL_STATES.logged;
+
+  const saveResult = await repository.saveMealLog(TODAY_ID, "lunch", {
+    ateWhenHungry: model.MEAL_ANSWERS.yes,
+    stoppedAtEnough: model.MEAL_ANSWERS.no,
+    now: FIXED_NOW,
+  });
+  mealsStore.shouldFailPut = null;
+
+  const todayState = await repository.getTodayTrackingState({ now: FIXED_NOW });
+  const meals = Object.fromEntries(todayState.meals.map((meal) => [meal.slot, meal]));
+
+  assert.equal(saveResult.available, true);
+  assert.equal(saveResult.status, "Error");
+  assert.deepEqual(saveResult.error, {
+    code: "meal-save-failed",
+    dayID: TODAY_ID,
+    slot: "lunch",
+  });
+  assert.equal(meals.breakfast.plannedText, "Oatmeal");
+  assert.equal(meals.breakfast.logState, model.MEAL_STATES.notLogged);
+  assert.equal(meals.lunch.plannedText, "Rice bowl");
+  assert.equal(meals.lunch.logState, model.MEAL_STATES.notLogged);
+  assert.equal(meals.dinner.plannedText, "Soup");
+  assert.equal(meals.dinner.logState, model.MEAL_STATES.notLogged);
+  assert.equal(meals.snack.plannedText, "Yogurt");
+  assert.equal(meals.snack.logState, model.MEAL_STATES.notLogged);
 });
 
 test("skipped meals and daily weight upserts stay distinct", async () => {
