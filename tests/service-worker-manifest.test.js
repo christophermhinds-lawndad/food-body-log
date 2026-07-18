@@ -83,10 +83,17 @@ test("cache readiness returns neutral status when service worker readiness never
 });
 
 test("service worker refreshes cached same-origin shell responses during online fetches", () => {
-  assert.match(swSource, /event\.respondWith\(fetchAndRefreshShellCache\(event\.request\)\)/);
+  assert.match(swSource, /event\.respondWith\(fetchAndRefreshShellCache\(event\.request,\s*\{\s*cacheRequest: isShellAsset,?\s*\}\)\)/s);
   assert.match(swSource, /cache\.put\(request,\s*response\.clone\(\)\)/);
   assert.match(swSource, /cache\.put\(shellFallbackUrl,\s*response\.clone\(\)\)/);
   assert.match(swSource, /fetch\(request\)[\s\S]*caches\.match\(fallback\)/);
+});
+
+test("service worker limits shell cache writes to app shell assets and navigations", () => {
+  assert.match(swSource, /const isShellAsset = shellAssetUrls\(\)\.has\(requestUrl\.toString\(\)\)/);
+  assert.match(swSource, /!isShellAsset && event\.request\.mode !== "navigate"/);
+  assert.match(swSource, /fetchAndRefreshShellCache\(event\.request,\s*\{\s*cacheRequest: isShellAsset,?\s*\}\)/s);
+  assert.match(swSource, /if \(cacheRequest && response\.ok\) \{/);
 });
 
 function createFakeCaches(scope, cachedAssets) {

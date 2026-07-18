@@ -38,9 +38,9 @@ export async function writeSetupStatus(status) {
     }
 
     const value = {
+      ...status,
       key: SETUP_STATUS_KEY,
       checkedAt: new Date().toISOString(),
-      ...status,
     };
 
     await putRecord(db, value);

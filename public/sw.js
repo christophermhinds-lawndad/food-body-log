@@ -42,21 +42,23 @@ self.addEventListener("fetch", (event) => {
 
   const requestUrl = new URL(event.request.url);
   const isSameOriginAppAsset = requestUrl.origin === self.location.origin;
+  const isShellAsset = shellAssetUrls().has(requestUrl.toString());
 
-  if (!isSameOriginAppAsset) {
+  if (!isSameOriginAppAsset || (!isShellAsset && event.request.mode !== "navigate")) {
     return;
   }
 
-  event.respondWith(fetchAndRefreshShellCache(event.request));
+  event.respondWith(fetchAndRefreshShellCache(event.request, { cacheRequest: isShellAsset }));
 });
 
-async function fetchAndRefreshShellCache(request) {
+async function fetchAndRefreshShellCache(request, options = {}) {
+  const cacheRequest = options.cacheRequest === true;
   const fallback = request.mode === "navigate" ? "./index.html" : request;
 
   try {
     const response = await fetch(request);
 
-    if (response.ok) {
+    if (cacheRequest && response.ok) {
       const cache = await caches.open(CACHE_NAME);
       await cache.put(request, response.clone());
 
@@ -70,4 +72,8 @@ async function fetchAndRefreshShellCache(request) {
   } catch {
     return caches.match(fallback);
   }
+}
+
+function shellAssetUrls() {
+  return new Set(APP_SHELL.map((asset) => new URL(asset, self.location.href).toString()));
 }

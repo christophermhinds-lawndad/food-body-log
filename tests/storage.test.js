@@ -115,6 +115,25 @@ test("setup status writes update one stable settings record", async () => {
   assert.equal(readResult.meta.recordCount, 1);
 });
 
+test("setup status writes preserve storage-owned key and timestamp", async () => {
+  installFakeIndexedDb();
+  const storage = await import(`../public/scripts/storage.js?invariants=${Date.now()}`);
+
+  const writeResult = await storage.writeSetupStatus({
+    key: "caller-controlled-key",
+    checkedAt: "2000-01-01T00:00:00.000Z",
+    storage: "Ready",
+  });
+  const readResult = await storage.readSetupStatus();
+
+  assert.equal(writeResult.available, true);
+  assert.equal(writeResult.value.key, "setup-status");
+  assert.notEqual(writeResult.value.checkedAt, "2000-01-01T00:00:00.000Z");
+  assert.equal(readResult.value.key, "setup-status");
+  assert.equal(readResult.value.checkedAt, writeResult.value.checkedAt);
+  assert.equal(readResult.meta.recordCount, 1);
+});
+
 test("storage adapter returns neutral unavailable status when IndexedDB is missing", async () => {
   delete globalThis.indexedDB;
   const storage = await import(`../public/scripts/storage.js?missing=${Date.now()}`);
