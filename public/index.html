@@ -55,21 +55,31 @@
           <dl class="status-list" aria-live="polite">
             <div class="status-row">
               <dt>Install mode</dt>
-              <dd id="install-mode-status">Not ready</dd>
+              <dd id="install-mode-status" data-status-value="installMode">Not ready</dd>
             </div>
             <div class="status-row">
               <dt>Offline app shell</dt>
-              <dd id="offline-cache-status">Not ready</dd>
+              <dd id="offline-cache-status" data-status-value="offlineCache">Not ready</dd>
             </div>
             <div class="status-row">
               <dt>Local storage</dt>
-              <dd id="local-storage-status">Not ready</dd>
+              <dd id="local-storage-status" data-status-value="storage">Not ready</dd>
+            </div>
+            <div class="status-row">
+              <dt>Local-only privacy</dt>
+              <dd data-status-value="localOnly">Your data stays on this device. Food, body, and journal data are not synced to an account.</dd>
+            </div>
+            <div class="status-row">
+              <dt>Storage caveat</dt>
+              <dd data-status-value="storageCaveat">Browser storage can be cleared by deleting the app or website data. Export/import arrives in a later phase.</dd>
+            </div>
+            <div class="status-row">
+              <dt>Updates</dt>
+              <dd data-status-value="updates">Updates may require revisiting the app URL after new static files are published.</dd>
             </div>
           </dl>
 
           <p id="settings-message" class="status-message">Open this app while online once more, then check again.</p>
-          <p class="note">Updates may require revisiting the app URL after new static files are published.</p>
-          <p class="note">Browser storage can be cleared by deleting the app or website data. Export/import arrives in a later phase.</p>
         </section>
       </main>
 

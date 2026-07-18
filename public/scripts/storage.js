@@ -65,12 +65,14 @@ export async function readSetupStatus() {
     }
 
     const value = await getRecord(db, SETUP_STATUS_KEY);
+    const recordCount = await getRecordCount(db, value);
     db.close?.();
 
     return {
       available: true,
       status: value ? "Ready" : "Not ready",
       value: value || null,
+      meta: { recordCount },
     };
   } catch {
     return { ...UNAVAILABLE };
@@ -89,6 +91,22 @@ function putRecord(db, value) {
 function getRecord(db, key) {
   return new Promise((resolve, reject) => {
     const request = db.transaction(SETTINGS_STORE, "readonly").objectStore(SETTINGS_STORE).get(key);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function getRecordCount(db, fallbackValue) {
+  return new Promise((resolve, reject) => {
+    const store = db.transaction(SETTINGS_STORE, "readonly").objectStore(SETTINGS_STORE);
+
+    if (typeof store.count !== "function") {
+      resolve(fallbackValue ? 1 : 0);
+      return;
+    }
+
+    const request = store.count();
 
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);

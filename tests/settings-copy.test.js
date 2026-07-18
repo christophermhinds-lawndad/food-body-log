@@ -4,6 +4,7 @@ import test from "node:test";
 
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
+const installStatusSource = await readFile(new URL("../public/scripts/install-status.js", import.meta.url), "utf8");
 
 test("settings copy includes required local-only, update, storage, and cache status text", () => {
   const requiredSnippets = [
@@ -16,7 +17,11 @@ test("settings copy includes required local-only, update, storage, and cache sta
   ];
 
   for (const snippet of requiredSnippets) {
-    assert.match(`${html}\n${appSource}`, new RegExp(escapeRegExp(snippet)), `missing copy: ${snippet}`);
+    assert.match(
+      `${html}\n${appSource}\n${installStatusSource}`,
+      new RegExp(escapeRegExp(snippet)),
+      `missing copy: ${snippet}`,
+    );
   }
 });
 
