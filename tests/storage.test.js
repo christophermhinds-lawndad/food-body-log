@@ -94,6 +94,27 @@ test("storage adapter opens version 1 settings store and writes/reads setup stat
   assert.equal(readResult.value.storage, "Ready");
 });
 
+test("setup status writes update one stable settings record", async () => {
+  installFakeIndexedDb();
+  const storage = await import(`../public/scripts/storage.js?idempotent=${Date.now()}`);
+
+  await storage.writeSetupStatus({
+    storage: "Checking",
+    offlineCache: "Not ready",
+  });
+  const secondWrite = await storage.writeSetupStatus({
+    storage: "Ready",
+    offlineCache: "Ready",
+  });
+  const readResult = await storage.readSetupStatus();
+
+  assert.equal(secondWrite.available, true);
+  assert.equal(readResult.value.key, "setup-status");
+  assert.equal(readResult.value.storage, "Ready");
+  assert.equal(readResult.value.offlineCache, "Ready");
+  assert.equal(readResult.meta.recordCount, 1);
+});
+
 test("storage adapter returns neutral unavailable status when IndexedDB is missing", async () => {
   delete globalThis.indexedDB;
   const storage = await import(`../public/scripts/storage.js?missing=${Date.now()}`);
