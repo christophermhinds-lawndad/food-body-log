@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const FIXED_NOW = new Date(2026, 6, 18, 8, 30, 0);
@@ -440,6 +441,37 @@ test("importSelectedBackup rejects oversized file metadata without reading or wr
   assert.equal(textCalled, false);
   assert.deepEqual(snapshotStores(db), original);
   assert.equal(db.transactions.filter((transaction) => transaction.mode === "readwrite").length, 0);
+});
+
+test("createDownloadSpec returns user-save JSON text without browser cache or URL side effects", async () => {
+  const { db, dataPortability } = await loadModules("download-spec");
+  seedPortableRecords(db);
+
+  const exported = await dataPortability.exportLocalData({ now: FIXED_NOW });
+  const spec = dataPortability.createDownloadSpec(exported.payload);
+
+  assert.equal(spec.available, true);
+  assert.equal(spec.status, "Ready");
+  assert.equal(spec.fileName, exported.fileName);
+  assert.equal(spec.mimeType, "application/json");
+  assert.equal(spec.text.endsWith("\n"), true);
+  assert.deepEqual(JSON.parse(spec.text), exported.payload);
+});
+
+test("data portability source remains local-only and avoids sensitive cache boundaries", async () => {
+  const source = await readFile(new URL("../public/scripts/data-portability.js", import.meta.url), "utf8");
+
+  assert.match(source, /from "\.\/storage\.js"/);
+  assert.doesNotMatch(source, /\bfetch\s*\(/);
+  assert.doesNotMatch(source, /\bXMLHttpRequest\b/);
+  assert.doesNotMatch(source, /\bsendBeacon\b/);
+  assert.doesNotMatch(source, /\bcaches\b/);
+  assert.doesNotMatch(source, /\bCacheStorage\b/);
+  assert.doesNotMatch(source, /\blocalStorage\b/);
+  assert.doesNotMatch(source, /\bhttps?:\/\//);
+  assert.doesNotMatch(source, /\bapi\/|backend|analytics|node_modules|package\.json|child_process|exec\(/i);
+  assert.doesNotMatch(source, /\binnerHTML\b|\binsertAdjacentHTML\b|\bDOMParser\b|\bdangerouslySetInnerHTML\b/);
+  assert.doesNotMatch(source, /\bcreateObjectURL\b|\brevokeObjectURL\b|\bBlob\b/);
 });
 
 function keyBy(records, key) {
