@@ -296,6 +296,7 @@ test("reports styles provide numeric tile selectors and 390px wrapping backstops
   assert.match(css, /\.weight-summary-notice[\s\S]*border-radius: 8px;[\s\S]*overflow-wrap: anywhere;/);
   assert.match(css, /\.weight-summary-notice\.is-progressing[\s\S]*border-color: var\(--accent\);/);
   assert.match(css, /\.weight-summary-notice\.is-reflect,[\s\S]*\.weight-summary-notice\.is-consider-more[\s\S]*border-color: var\(--destructive\);/);
+  assert.match(css, /\.weight-summary-notice\.is-stable[\s\S]*border-color: #7C5CA8;[\s\S]*background: #F2ECFA;/);
   assert.match(css, /\.report-value[\s\S]*font-size: 16px;[\s\S]*font-weight: 600;[\s\S]*line-height: 1\.5;/);
   assert.doesNotMatch(css, /\.report-value[\s\S]*font-size: (?:20px|28px);/);
   assert.match(css, /\.report-card h3,[\s\S]*\.report-label,[\s\S]*\.report-value,[\s\S]*\.report-denominator,[\s\S]*\.report-state[\s\S]*overflow-wrap: anywhere;/);

@@ -678,6 +678,11 @@ p {
   background: #E5F4EA;
 }
 
+.weight-summary-notice.is-stable {
+  border-color: #7C5CA8;
+  background: #F2ECFA;
+}
+
 .weight-summary-lines {
   display: grid;
   min-width: 0;
