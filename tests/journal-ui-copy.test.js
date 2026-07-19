@@ -6,6 +6,7 @@ const html = await readFile(new URL("../public/index.html", import.meta.url), "u
 const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
 const modelSource = await readFile(new URL("../public/scripts/journal-model.js", import.meta.url), "utf8");
+const historyReportsSource = await readFile(new URL("../public/scripts/history-reports.js", import.meta.url), "utf8");
 const phase04UatUrl = new URL("../.planning/phases/04-evening-reflection-and-breakthroughs/04-UAT.md", import.meta.url);
 
 const journalRequiredCopy = [
@@ -37,7 +38,7 @@ const journalRequiredCopy = [
   "No breakthroughs saved yet",
   "Mark an answer as a breakthrough when something feels useful to remember.",
   "View source day",
-  "Source-day navigation will open this day when History is available.",
+  "Opened source day in History.",
   "Drop from breakthroughs",
   "Breakthrough removed. The original answer stayed saved.",
   "Remove the breakthrough highlight? The original journal answer will stay saved.",
@@ -62,7 +63,7 @@ const forbiddenJournalCopy = [
 ];
 
 test("journal surface exposes required Reflection and Breakthroughs copy", () => {
-  const source = `${html}\n${appSource}\n${modelSource}`;
+  const source = `${html}\n${appSource}\n${modelSource}\n${historyReportsSource}`;
 
   for (const copy of journalRequiredCopy) {
     assert.match(source, new RegExp(escapeRegExp(copy)), `missing Journal copy: ${copy}`);
@@ -70,7 +71,7 @@ test("journal surface exposes required Reflection and Breakthroughs copy", () =>
 });
 
 test("journal markup starts with usable reflection form and optional fields", () => {
-  const journalSurface = html.match(/<section class="view-panel[^"]*" data-view="journal"[\s\S]*?<\/section>\s*<section class="view-panel" data-view="history"/)?.[0] || "";
+  const journalSurface = html.match(/<section class="view-panel[^"]*" data-view="journal"[\s\S]*?<\/section>\s*<section class="view-panel[^"]*" data-view="history"/)?.[0] || "";
 
   assert.match(journalSurface, /<form[^>]+id="journal-form"[^>]+class="stack-form"/);
   assert.match(journalSurface, /id="journal-prompt-list"/);
@@ -96,7 +97,8 @@ test("journal controller imports repository and wires load save breakthrough act
   assert.match(appSource, /function serializeJournalAnswers\(\)/);
   assert.match(appSource, /async function toggleAnswerBreakthrough\(button\)/);
   assert.match(appSource, /async function dropSelectedBreakthrough\(button\)/);
-  assert.match(appSource, /function showSourceDayMessage\(button\)/);
+  assert.match(appSource, /function openHistorySourceDay\(dayID\)/);
+  assert.match(appSource, /openHistorySourceDay\(card\?\.dataset\.dayId \|\| journalDayID\)/);
 });
 
 test("journal dynamic rendering uses DOM nodes and scoped closest actions", () => {

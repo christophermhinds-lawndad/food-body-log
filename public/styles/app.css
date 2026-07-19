@@ -162,6 +162,9 @@ p {
 [data-toggle-breakthrough]:focus-visible,
 [data-source-day]:focus-visible,
 [data-drop-breakthrough]:focus-visible,
+[data-history-day]:focus-visible,
+[data-history-save]:focus-visible,
+[data-history-answer-chip]:focus-visible,
 .plan-suggestion-option:focus-visible,
 .segmented-control label:focus-within,
 .metric-group label:focus-within,
@@ -521,6 +524,118 @@ p {
   color: var(--destructive);
 }
 
+.history-view,
+.history-list,
+.day-detail,
+[data-history-meal-list],
+[data-history-answer-list] {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.history-list {
+  gap: 16px;
+}
+
+.history-day-card,
+.day-detail,
+.history-detail-section {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.history-day-card.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.history-day-button {
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  min-width: 0;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.history-day-summary,
+.history-detail-section p,
+.history-value-row,
+.history-value-row p,
+.history-field-stack,
+.history-chip-list {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.day-detail {
+  gap: 16px;
+  scroll-margin-bottom: 96px;
+}
+
+.day-detail-header {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.editable-badge,
+.read-only-badge {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 32px;
+  align-items: center;
+  margin: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-secondary);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.editable-badge {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.history-value-row {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-secondary);
+}
+
+.history-value-row p {
+  margin: 0;
+}
+
+.history-field-stack {
+  display: grid;
+  gap: 8px;
+}
+
 .button-row:has([data-unskip-meal]:not([hidden])) {
   grid-template-columns: 1fr;
 }
@@ -642,13 +757,28 @@ p {
 }
 
 @media (max-width: 430px) {
+  /* 390px iPhone history overflow backstop */
+  .history-list,
+  .day-detail,
+  .history-detail-section,
+  .history-chip-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .day-detail-header,
+  .history-value-row {
+    align-items: stretch;
+  }
+
   .journal-prompt-card,
   .breakthrough-card {
     padding: 16px;
   }
 
   .journal-chip-list,
+  .history-chip-list,
   .breakthrough-card .button-row {
+    display: grid;
     grid-template-columns: 1fr;
   }
 }

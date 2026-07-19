@@ -6,6 +6,7 @@ const historyReportsSource = await readFile(new URL("../public/scripts/history-r
 const historyReportsTests = await readFile(new URL("./history-reports.test.js", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 
 const requiredExports = [
   "getHistoryState",
@@ -168,6 +169,45 @@ test("history dynamic rendering uses text-safe sinks and form values instead of 
   assert.match(historyControllerSlice(), /\.value\s*=/);
 });
 
+test("history styles provide required mobile-safe selectors and wrapping backstops", () => {
+  for (const selector of [
+    ".history-list",
+    ".history-day-card",
+    ".history-day-card.is-selected",
+    ".day-detail",
+    ".history-detail-section",
+    ".editable-badge",
+    ".read-only-badge",
+    ".history-value-row",
+  ]) {
+    assert.match(css, new RegExp(escapeRegExp(selector)), `missing ${selector} styles`);
+  }
+
+  assert.match(css, /\.history-day-card,[\s\S]*\.day-detail,[\s\S]*\.history-detail-section[\s\S]*border-radius: 8px;[\s\S]*background: var\(--surface\);/);
+  assert.match(css, /\.history-day-button[\s\S]*min-height: 44px;[\s\S]*text-align: left;/);
+  assert.match(css, /\.history-day-card\.is-selected[\s\S]*border-color: var\(--accent\);[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\);/);
+  assert.match(css, /\.editable-badge,[\s\S]*\.read-only-badge[\s\S]*min-height: 32px;[\s\S]*border-radius: 8px;[\s\S]*font-size: 13px;/);
+  assert.match(css, /\.history-day-summary,[\s\S]*\.history-detail-section p,[\s\S]*\.history-value-row,[\s\S]*\.history-value-row p,[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(css, /390px iPhone history overflow backstop/);
+  assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.history-list,[\s\S]*\.day-detail,[\s\S]*\.history-detail-section,[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
+});
+
+test("history styles extend focus-visible coverage and avoid destructive controls", () => {
+  const focusBlock = css.match(/\.primary-action:focus-visible[\s\S]*?\{[\s\S]*?outline: 3px solid var\(--accent\);[\s\S]*?\}/)?.[0] || "";
+
+  for (const selector of [
+    "[data-history-day]:focus-visible",
+    "[data-history-save]:focus-visible",
+    "[data-history-answer-chip]:focus-visible",
+  ]) {
+    assert.match(focusBlock, new RegExp(escapeRegExp(selector)), `missing focus selector ${selector}`);
+  }
+
+  assert.doesNotMatch(historyPanelHtml(), />\s*(?:Delete|Reset|Export|Import)\b/i);
+  assert.doesNotMatch(css, /\.history-[^{]*(?:destructive|delete|reset|export|import)/i);
+  assert.doesNotMatch(historyDayTemplateHtml(), /history-detail-section/);
+});
+
 function historyPanelHtml() {
   const start = html.indexOf('data-view="history"');
   const end = html.indexOf('data-view="settings"', start);
@@ -178,6 +218,10 @@ function historyControllerSlice() {
   const start = appSource.indexOf("async function loadHistoryView");
   const end = appSource.indexOf("async function saveTodayWeight");
   return start >= 0 && end > start ? appSource.slice(start, end) : "";
+}
+
+function historyDayTemplateHtml() {
+  return html.match(/<template data-history-day-template>[\s\S]*?<\/template>/)?.[0] || "";
 }
 
 function escapeRegExp(value) {

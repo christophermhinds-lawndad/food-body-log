@@ -132,6 +132,9 @@ test("journal controls share the existing focus-visible treatment", () => {
     "[data-toggle-breakthrough]:focus-visible",
     "[data-source-day]:focus-visible",
     "[data-drop-breakthrough]:focus-visible",
+    "[data-history-day]:focus-visible",
+    "[data-history-save]:focus-visible",
+    "[data-history-answer-chip]:focus-visible",
   ]) {
     assert.match(focusBlock, new RegExp(escapeRegExp(selector)), `missing focus selector ${selector}`);
   }
