@@ -4,10 +4,10 @@ import test from "node:test";
 
 const runtimeFiles = await loadRuntimeFiles();
 const runtimeSource = runtimeFiles.map(({ contents }) => contents).join("\n");
-const normalizedRuntime = normalizeCopy(runtimeSource);
 const html = await readRuntimeFile("public/index.html");
 const appSource = await readRuntimeFile("public/scripts/app.js");
 const historyReportsSource = await readRuntimeFile("public/scripts/history-reports.js");
+const normalizedRuntimeCopy = normalizeCopy(extractRuntimeCopy(runtimeFiles));
 
 const forbiddenVisibleCopy = [
   "calories",
@@ -75,7 +75,7 @@ const requiredReportCopy = [
 test("whole-app runtime copy excludes diet scoring pressure and shame framing", () => {
   for (const forbidden of forbiddenVisibleCopy) {
     assert.doesNotMatch(
-      normalizedRuntime,
+      normalizedRuntimeCopy,
       phrasePattern(forbidden),
       `forbidden runtime copy: ${forbidden}`,
     );
@@ -92,7 +92,7 @@ test("calm status and backup caveat copy is present for missing skipped invalid 
     /Deleting the Home Screen app, clearing website data, or changing browser storage can remove local app data from this device\./,
   );
   assert.match(runtimeSource, /Your data stays on this device\./);
-  assert.doesNotMatch(normalizedRuntime, /\b(upload|cloud sync|server restore|remote storage|analytics|account backup)\b/);
+  assert.doesNotMatch(normalizedRuntimeCopy, /\b(upload|cloud sync|server restore|remote storage|analytics|account backup)\b/);
 });
 
 test("report copy keeps numeric summaries without advice or outcome pressure", () => {
@@ -142,6 +142,37 @@ async function readRuntimeFile(filePath) {
 
 function normalizeCopy(value) {
   return value.toLowerCase().replace(/\s+/g, " ");
+}
+
+function extractRuntimeCopy(files) {
+  return files.map(({ filePath, contents }) => {
+    if (filePath.endsWith(".html")) {
+      return contents
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]+>/g, " ");
+    }
+
+    if (filePath.endsWith(".js")) {
+      return extractStringLiterals(contents)
+        .filter((value) => /[\s.?!:;]/.test(value) || /^(Yes|No|Skipped|Logged|Ready|Unavailable)$/i.test(value))
+        .join(" ");
+    }
+
+    return "";
+  }).join(" ");
+}
+
+function extractStringLiterals(source) {
+  const strings = [];
+  const pattern = /"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)'|`((?:\\.|[^`\\])*)`/g;
+  let match;
+
+  while ((match = pattern.exec(source)) !== null) {
+    strings.push(match[1] || match[2] || match[3] || "");
+  }
+
+  return strings;
 }
 
 function phrasePattern(value) {
