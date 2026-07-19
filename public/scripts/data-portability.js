@@ -1,4 +1,5 @@
 import { openAppDb } from "./storage.js";
+import { JOURNAL_CHIPS, JOURNAL_PROMPTS, OUTSIDE_PLAN_PROMPT_ID } from "./journal-model.js?v=2";
 
 const APP_ID = "food-body-log";
 const EXPORT_VERSION = 1;
@@ -20,6 +21,35 @@ const MEAL_SLOTS = Object.freeze(["breakfast", "lunch", "dinner", "snack"]);
 const MEAL_STATES = Object.freeze(["notLogged", "logged", "skipped"]);
 const MEAL_ANSWERS = Object.freeze(["yes", "no", "unanswered"]);
 const BREAKTHROUGH_STATES = Object.freeze(["none", "marked", "dropped"]);
+const JOURNAL_PROMPT_SNAPSHOTS = Object.freeze([
+  Object.freeze({
+    id: OUTSIDE_PLAN_PROMPT_ID,
+    text: "Did I eat food outside of my plan, when I was not hungry?",
+    supportsChips: false,
+    supportsDetail: false,
+  }),
+  ...JOURNAL_PROMPTS,
+  Object.freeze({
+    id: "outside-plan-food",
+    text: "What food?",
+    supportsChips: false,
+    supportsDetail: false,
+  }),
+  Object.freeze({
+    id: "outside-plan-time",
+    text: "What time of day?",
+    supportsChips: false,
+    supportsDetail: false,
+  }),
+  Object.freeze({
+    id: "outside-plan-context",
+    text: "Context Tiles",
+    supportsChips: true,
+    supportsDetail: true,
+  }),
+]);
+const JOURNAL_PROMPT_BY_ID = new Map(JOURNAL_PROMPT_SNAPSHOTS.map((prompt) => [prompt.id, prompt]));
+const JOURNAL_CHIP_BY_ID = new Map(JOURNAL_CHIPS.map((chip) => [chip.id, chip]));
 const UNAVAILABLE = Object.freeze({
   available: false,
   status: "Unavailable",
@@ -373,7 +403,10 @@ function normalizeJournalAnswerRecord(record) {
     return { valid: false, reason: "invalid-answer-id" };
   }
 
+  const prompt = JOURNAL_PROMPT_BY_ID.get(record.promptID);
+
   if (!nonEmptyString(record.promptID)
+    || !prompt
     || typeof record.promptText !== "string"
     || typeof record.supportsChips !== "boolean"
     || typeof record.supportsDetail !== "boolean"
@@ -382,7 +415,16 @@ function normalizeJournalAnswerRecord(record) {
     return { valid: false, reason: "invalid-answer-shape" };
   }
 
-  if (!Array.isArray(record.selectedChips) || !record.selectedChips.every(isValidChip)) {
+  if (record.promptText !== prompt.text
+    || record.supportsChips !== prompt.supportsChips
+    || record.supportsDetail !== prompt.supportsDetail) {
+    return { valid: false, reason: "invalid-answer-prompt" };
+  }
+
+  if (!Array.isArray(record.selectedChips)
+    || !record.selectedChips.every(isValidChip)
+    || record.selectedChips.some((chip) => JOURNAL_CHIP_BY_ID.get(chip.id)?.label !== chip.label)
+    || (!prompt.supportsChips && record.selectedChips.length > 0)) {
     return { valid: false, reason: "invalid-chip" };
   }
 

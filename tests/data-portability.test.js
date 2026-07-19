@@ -437,6 +437,33 @@ test("invalid backups are rejected before any write transaction opens", async ()
       payload.data.journalAnswers[0].selectedChips = [{ id: "", label: "Missing" }];
       return payload;
     })(), "invalid-record"],
+    ["unknown journal prompt", (() => {
+      const payload = clonePayload(exported.payload);
+      payload.data.journalAnswers[0].id = "2026-07-17:journal:future-prompt";
+      payload.data.journalAnswers[0].promptID = "future-prompt";
+      payload.data.journalAnswers[0].promptText = "Future prompt";
+      return payload;
+    })(), "invalid-record"],
+    ["unknown journal chip", (() => {
+      const payload = clonePayload(exported.payload);
+      payload.data.journalAnswers[0].selectedChips = [{ id: "future-chip", label: "Future chip" }];
+      return payload;
+    })(), "invalid-record"],
+    ["mismatched journal chip label", (() => {
+      const payload = clonePayload(exported.payload);
+      payload.data.journalAnswers[0].selectedChips = [{ id: "rushed", label: "Rush" }];
+      return payload;
+    })(), "invalid-record"],
+    ["chip on prompt without chips", (() => {
+      const payload = clonePayload(exported.payload);
+      payload.data.journalAnswers[0].id = "2026-07-17:journal:baseline-helped";
+      payload.data.journalAnswers[0].promptID = "baseline-helped";
+      payload.data.journalAnswers[0].promptText = "What helped me listen to hunger or enough today?";
+      payload.data.journalAnswers[0].supportsChips = false;
+      payload.data.journalAnswers[0].supportsDetail = false;
+      payload.data.journalAnswers[0].selectedChips = [{ id: "rushed", label: "Rushed" }];
+      return payload;
+    })(), "invalid-record"],
   ];
 
   for (const [name, payload, code] of invalidPayloads) {
