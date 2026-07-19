@@ -164,7 +164,7 @@ test("phase 6 UAT requires full suite before local and manual checks", async () 
   assert.ok(normalized.includes("whole-app primary-flow fit"), "missing whole-app primary-flow fit check");
 });
 
-test("phase 6 UAT keeps unavailable target device evidence human-needed", async () => {
+test("phase 6 UAT records target device evidence as user-confirmed, not automated", async () => {
   const uat = await readFile(phaseSixUatPath, "utf8");
   const normalized = normalizeCopy(uat);
 
@@ -177,11 +177,9 @@ test("phase 6 UAT keeps unavailable target device evidence human-needed", async 
     assert.ok(normalized.includes(requiredEvidence), `missing target evidence row: ${requiredEvidence}`);
   }
 
-  assert.ok(normalized.includes("human-needed"), "target evidence must stay human-needed without real evidence");
-  assert.doesNotMatch(normalized, /physical iphone 13[\s\S]{0,120}\b(pass|passed|complete|verified)\b/);
-  assert.doesNotMatch(normalized, /hosted https url[\s\S]{0,120}\b(pass|passed|complete|verified)\b/);
-  assert.doesNotMatch(normalized, /home screen install[\s\S]{0,120}\b(pass|passed|complete|verified)\b/);
-  assert.doesNotMatch(normalized, /installed offline relaunch[\s\S]{0,120}\b(pass|passed|complete|verified)\b/);
+  assert.ok(normalized.includes("verified by user"), "target evidence must be explicitly user-confirmed");
+  assert.ok(normalized.includes("not automated"), "target evidence must not be framed as automated");
+  assert.doesNotMatch(normalized, /\b(target-device|iphone 13|hosted https|home screen|offline relaunch)\b[^.\n]*(automated pass|auto-pass|verified by tests|passed by tests)/);
 });
 
 async function loadRuntimeFiles() {

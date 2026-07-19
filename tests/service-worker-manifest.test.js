@@ -145,9 +145,10 @@ test("phase 6 UAT does not claim automated evidence for target install and offli
     "home screen install",
     "installed offline relaunch",
   ]) {
-    assert.match(normalized, new RegExp(`${escapeRegExp(row)}[^|\\n]*\\|\\s*human-needed`), `${row} must be human-needed`);
+    assert.match(normalized, new RegExp(`${escapeRegExp(row)}[^|\\n]*\\|\\s*verified by user`), `${row} must be user-confirmed`);
   }
 
+  assert.match(normalized, /target-device, hosted https, home screen, and offline relaunch evidence is user-confirmed, not automated/);
   assert.doesNotMatch(normalized, /\b(target-device|iphone 13|hosted https|home screen|offline relaunch)\b[^.\n]*(automated pass|auto-pass|verified by tests|passed by tests)/);
 });
 
