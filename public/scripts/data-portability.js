@@ -15,6 +15,7 @@ const STORE_KEY_PATHS = Object.freeze({
   weights: "dayID",
   journalAnswers: "id",
 });
+const NON_PORTABLE_SETTINGS_KEYS = Object.freeze(["setup-status"]);
 const MEAL_SLOTS = Object.freeze(["breakfast", "lunch", "dinner", "snack"]);
 const MEAL_STATES = Object.freeze(["notLogged", "logged", "skipped"]);
 const MEAL_ANSWERS = Object.freeze(["yes", "no", "unanswered"]);
@@ -38,7 +39,7 @@ export async function exportLocalData(options = {}) {
     const exportedAt = isoString(options.now || new Date());
     const dataEntries = await Promise.all(STORE_NAMES.map(async (storeName) => [
       storeName,
-      await getAllRecords(db, storeName),
+      portableRecords(storeName, await getAllRecords(db, storeName)),
     ]));
 
     return {
@@ -108,6 +109,10 @@ export function validateBackupPayload(payload) {
 
       if (!normalized.valid) {
         return invalidResult("invalid-record", { storeName, reason: normalized.reason });
+      }
+
+      if (normalized.record == null) {
+        continue;
       }
 
       const key = normalized.record[STORE_KEY_PATHS[storeName]];
@@ -314,6 +319,10 @@ function normalizeSettingsRecord(record) {
     return { valid: false, reason: "missing-key" };
   }
 
+  if (NON_PORTABLE_SETTINGS_KEYS.includes(record.key)) {
+    return { valid: true, record: null };
+  }
+
   return { valid: true, record: structuredClone(record) };
 }
 
@@ -388,6 +397,14 @@ function normalizeJournalAnswerRecord(record) {
 
 function restoredCounts(data) {
   return Object.fromEntries(STORE_NAMES.map((storeName) => [storeName, data[storeName].length]));
+}
+
+function portableRecords(storeName, records) {
+  if (storeName !== "settings") {
+    return records;
+  }
+
+  return records.filter((record) => !NON_PORTABLE_SETTINGS_KEYS.includes(record.key));
 }
 
 function invalidResult(code, details = {}) {

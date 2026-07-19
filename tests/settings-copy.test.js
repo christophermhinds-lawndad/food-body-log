@@ -28,7 +28,7 @@ test("settings copy includes required local-only, update, storage, and cache sta
 test("settings backup copy exposes export import warnings and confirmation language", () => {
   const requiredSnippets = [
     "Data backup",
-    "Backups are JSON files you control. They include saved meals, weight entries, reflections, breakthroughs, and app settings from this device.",
+    "Backups are JSON files you control. They include saved meals, weight entries, reflections, breakthroughs, and portable app settings from this device.",
     "Export backup",
     "Preparing backup...",
     "Backup exported. Keep the file somewhere you can find it later.",

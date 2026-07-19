@@ -290,7 +290,8 @@ test("exportLocalData returns a versioned JSON envelope with all local stores", 
   assert.equal(result.payload.dbVersion, 3);
   assert.equal(result.payload.exportedAt, FIXED_NOW_ISO);
   assert.deepEqual(Object.keys(result.payload.data).sort(), [...STORE_NAMES].sort());
-  assert.deepEqual(result.payload.data.settings, Object.values(recordsByKey(db, "settings")));
+  assert.deepEqual(result.payload.data.settings, []);
+  assert.equal(recordsByKey(db, "settings")["setup-status"].cacheStatus, "ready");
   assert.deepEqual(result.payload.data.days, Object.values(recordsByKey(db, "days")));
   assert.deepEqual(result.payload.data.meals, Object.values(recordsByKey(db, "meals")));
   assert.deepEqual(result.payload.data.weights, Object.values(recordsByKey(db, "weights")));
@@ -318,6 +319,12 @@ test("replaceLocalDataFromBackup clears prior records and restores exported data
   seedPortableRecords(first.db);
   const exported = await first.dataPortability.exportLocalData({ now: FIXED_NOW });
   const expected = clonePayload(exported.payload);
+  expected.data.settings = [{
+    key: "setup-status",
+    installMode: "standalone",
+    offlineCache: "ready",
+    cacheStatus: "ready",
+  }];
 
   const second = await loadModules("round-trip-target");
   seedRecord(second.db, "settings", { key: "old-setting", stale: true });
@@ -354,12 +361,12 @@ test("replaceLocalDataFromBackup clears prior records and restores exported data
 
   assert.equal(result.available, true);
   assert.equal(result.status, "Ready");
-  assert.equal(result.restoredCounts.settings, 1);
+  assert.equal(result.restoredCounts.settings, 0);
   assert.equal(result.restoredCounts.days, 1);
   assert.equal(result.restoredCounts.meals, 1);
   assert.equal(result.restoredCounts.weights, 1);
   assert.equal(result.restoredCounts.journalAnswers, 1);
-  assert.deepEqual(snapshotStores(second.db).settings.records, keyBy(expected.data.settings, "key"));
+  assert.deepEqual(snapshotStores(second.db).settings.records, {});
   assert.deepEqual(snapshotStores(second.db).days.records, keyBy(expected.data.days, "dayID"));
   assert.deepEqual(snapshotStores(second.db).meals.records, keyBy(expected.data.meals, "id"));
   assert.deepEqual(snapshotStores(second.db).weights.records, keyBy(expected.data.weights, "dayID"));
