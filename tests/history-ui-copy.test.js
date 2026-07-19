@@ -7,6 +7,7 @@ const historyReportsTests = await readFile(new URL("./history-reports.test.js", 
 const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
 const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
+const phaseFiveUat = await readFile(new URL("../.planning/phases/05-history-and-numeric-reports/05-UAT.md", import.meta.url), "utf8");
 
 const requiredExports = [
   "getHistoryState",
@@ -291,6 +292,55 @@ test("reports surface stays numeric-only with no visualizations framing or netwo
   assert.doesNotMatch(historyReportsSource, /\b(?:fetch|XMLHttpRequest|sendBeacon|https?:\/\/|analytics|backend|api\/)\b/i);
 });
 
+test("Phase 05 UAT names History and Reports manual backstops", () => {
+  const normalized = normalizeDoc(phaseFiveUat);
+
+  for (const snippet of [
+    "history empty state",
+    "saved partial days",
+    "editable day save",
+    "prior-day weight large-change confirmation",
+    "read-only day presentation",
+    "breakthrough source-day navigation",
+    "history long text wrapping",
+    "many-day vertical scrolling",
+    "reports no-data state",
+    "reports one-usable-meal insufficient state",
+    "reports numeric-ready state with denominators",
+    "no chart, trend, goal, or advice presentation",
+    "cache-ready settings status after refresh",
+  ]) {
+    assert.ok(normalized.includes(snippet), `missing Phase 05 UAT backstop: ${snippet}`);
+  }
+});
+
+test("Phase 05 UAT keeps unavailable target-device evidence human-needed", () => {
+  const normalized = normalizeDoc(phaseFiveUat);
+  const evidenceRows = phaseFiveUat
+    .toLowerCase()
+    .split("\n")
+    .filter((line) => /^\| (physical iphone 13|home screen|hosted https|installed offline relaunch)/.test(line));
+
+  for (const snippet of [
+    "physical iphone 13 safari visual fit | human-needed",
+    "home screen install and standalone relaunch | human-needed",
+    "hosted https static-host url | human-needed",
+    "installed offline relaunch | human-needed",
+    "no physical iphone 13 evidence was captured",
+    "no home screen install evidence was captured",
+    "no hosted https static-host url evidence was captured",
+    "no installed offline relaunch evidence was captured",
+  ]) {
+    assert.ok(normalized.includes(snippet), `missing human-needed evidence wording: ${snippet}`);
+  }
+
+  assert.equal(evidenceRows.length, 4);
+  for (const row of evidenceRows) {
+    assert.match(row, /\| human-needed \|/);
+    assert.doesNotMatch(row, /\| (?:passed|verified|complete) \|/);
+  }
+});
+
 function historyPanelHtml() {
   const start = html.indexOf('data-view="history"');
   const end = html.indexOf('data-view="settings"', start);
@@ -321,4 +371,8 @@ function historyDayTemplateHtml() {
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeDoc(value) {
+  return value.toLowerCase().replace(/\s+/g, " ");
 }
