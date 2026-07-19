@@ -1,7 +1,7 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=9";
+import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=10";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
 import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=4";
@@ -50,6 +50,7 @@ const mealReports = document.querySelector("#meal-reports");
 const reportTileTemplate = document.querySelector("[data-report-tile-template]");
 const historyStatus = document.querySelector("#history-status");
 const historyList = document.querySelector("#history-list");
+const historyPagination = document.querySelector("#history-pagination");
 const historyDetail = document.querySelector("#history-detail");
 const historyDetailTitle = document.querySelector("#history-detail-title");
 const historySaveMessage = document.querySelector("#history-save-message");
@@ -81,6 +82,8 @@ const NO_EXTRA_PROMPTS_MESSAGE = "Nothing extra to reflect on from today's meal 
 const MISSING_MEAL_DATA_MESSAGE = "Not all meals are logged yet. That is okay; only logged non-skipped No answers add extra prompts.";
 const DROP_SUCCESS_MESSAGE = "Breakthrough removed. The original answer stayed saved.";
 const MAX_BACKUP_FILE_BYTES = 2_000_000;
+const HISTORY_PAGE_SIZE = 5;
+const HISTORY_MAX_VISIBLE_DAYS = 15;
 const BACKUP_UI_COPY = Object.freeze({
   exportPreparing: "Preparing backup...",
   exportSuccess: "Backup exported. Keep the file somewhere you can find it later.",
@@ -108,10 +111,12 @@ let journalLoadRequestID = 0;
 let reportsLoadRequestID = 0;
 let historyLoadRequestID = 0;
 let historyDayLoadRequestID = 0;
+let historyPageIndex = 0;
 let backupSelectionRequestID = 0;
 let readyBackupPayload = null;
 let readyBackupOverlapDayCount = 0;
 let currentJournalState = null;
+let currentHistoryState = null;
 let currentHistoryDayState = null;
 let pendingWeightConfirmation = null;
 let pendingHistoryWeightConfirmation = null;
@@ -260,6 +265,14 @@ historyList?.addEventListener("click", (event) => {
 
   if (button?.dataset.dayId) {
     loadSelectedHistoryDay(button.dataset.dayId, { focusDetail: true });
+  }
+});
+
+historyPagination?.addEventListener("click", (event) => {
+  const button = event.target?.closest?.("[data-history-page]");
+
+  if (button) {
+    changeHistoryPage(button.dataset.historyPage);
   }
 });
 
@@ -964,15 +977,15 @@ async function loadHistoryView() {
     return;
   }
 
-  renderHistoryState(state);
   const sourceDayID = pendingHistorySourceDayID;
   pendingHistorySourceDayID = "";
+  renderHistoryState(state, { preferredDayID: sourceDayID || historySelectedDayID });
 
   if (!state.available) {
     return;
   }
 
-  if (sourceDayID) {
+  if (sourceDayID && isHistoryDayViewable(sourceDayID)) {
     await loadSelectedHistoryDay(sourceDayID, {
       sourceDay: true,
       focusDetail: true,
@@ -980,12 +993,23 @@ async function loadHistoryView() {
     return;
   }
 
+  if (sourceDayID) {
+    setText(historyStatus, historyLimitedStatusText(state.days.length));
+  }
+
   if (state.days.length === 0) {
     return;
   }
 
-  const selectedDayID = sourceDayID
-    || (state.days.some((day) => day.dayID === historySelectedDayID) ? historySelectedDayID : state.days[0].dayID);
+  const viewableDays = historyViewableDays();
+  const selectedDayID = sourceDayID && isHistoryDayViewable(sourceDayID)
+    ? sourceDayID
+    : (viewableDays.some((day) => day.dayID === historySelectedDayID) ? historySelectedDayID : viewableDays[0]?.dayID);
+
+  if (!selectedDayID) {
+    return;
+  }
+
   await loadSelectedHistoryDay(selectedDayID, {
     sourceDay: false,
     focusDetail: false,
@@ -1002,6 +1026,7 @@ async function loadSelectedHistoryDay(dayID, options = {}) {
   const requestID = historyDayLoadRequestID + 1;
   historyDayLoadRequestID = requestID;
   historySelectedDayID = requestedDayID;
+  ensureHistoryPageForDay(requestedDayID);
   markSelectedHistoryDay(requestedDayID);
   setText(historyDetailTitle, requestedDayID);
   setText(historySaveMessage, "");
@@ -1025,26 +1050,36 @@ async function loadSelectedHistoryDay(dayID, options = {}) {
   }
 }
 
-function renderHistoryState(state) {
+function renderHistoryState(state, options = {}) {
+  currentHistoryState = state;
   replaceChildren(historyList);
+  renderHistoryPagination();
   currentHistoryDayState = null;
   setText(historySaveMessage, "");
 
   if (!state.available) {
     historyDetail.hidden = true;
+    renderHistoryPagination();
     setText(historyStatus, HISTORY_COPY.error);
     return;
   }
 
   if (!state.days.length) {
     historyDetail.hidden = true;
+    renderHistoryPagination();
     renderHistoryEmptyState();
     return;
   }
 
-  setText(historyStatus, state.days.length === 1 ? "1 day with saved entries." : `${state.days.length} days with saved entries.`);
+  if (options.preferredDayID) {
+    ensureHistoryPageForDay(options.preferredDayID, { skipRender: true });
+  }
 
-  for (const day of state.days) {
+  const pageDays = historyPageDays();
+  setText(historyStatus, historyStatusText(state.days.length));
+  renderHistoryPagination();
+
+  for (const day of pageDays) {
     historyList?.append(renderHistoryDayCard(day));
   }
 }
@@ -1053,6 +1088,12 @@ function renderHistoryDayDetail(dayState) {
   currentHistoryDayState = dayState;
   const dayID = dayState.day?.dayID || historySelectedDayID;
   const isEditable = dayState.editStatus === "Editable";
+  const selectedCard = historyCardForDay(dayID);
+
+  if (selectedCard && historyDetail?.parentNode !== selectedCard) {
+    selectedCard.append(historyDetail);
+  }
+
   historyDetail.hidden = false;
   historyDetail.dataset.editStatus = dayState.editStatus || "";
   setText(historyDetailDate, dayID);
@@ -1160,6 +1201,121 @@ function renderHistoryEmptyState() {
   setText(historyStatus, "");
 }
 
+function changeHistoryPage(action) {
+  const pageCount = historyPageCount();
+  const nextPageIndex = action === "previous"
+    ? historyPageIndex - 1
+    : historyPageIndex + 1;
+  const clampedPageIndex = Math.min(Math.max(nextPageIndex, 0), Math.max(pageCount - 1, 0));
+
+  if (clampedPageIndex === historyPageIndex || !currentHistoryState?.available) {
+    return;
+  }
+
+  historyPageIndex = clampedPageIndex;
+  historySelectedDayID = "";
+  pendingHistoryWeightConfirmation = null;
+  renderHistoryState(currentHistoryState);
+  const firstPageDayID = historyPageDays()[0]?.dayID || "";
+
+  if (firstPageDayID) {
+    loadSelectedHistoryDay(firstPageDayID, { focusDetail: false });
+  }
+}
+
+function historyViewableDays() {
+  return (currentHistoryState?.days || []).slice(0, HISTORY_MAX_VISIBLE_DAYS);
+}
+
+function historyPageDays() {
+  const startIndex = historyPageIndex * HISTORY_PAGE_SIZE;
+  return historyViewableDays().slice(startIndex, startIndex + HISTORY_PAGE_SIZE);
+}
+
+function historyPageCount() {
+  return Math.max(1, Math.ceil(historyViewableDays().length / HISTORY_PAGE_SIZE));
+}
+
+function ensureHistoryPageForDay(dayID, options = {}) {
+  const dayIndex = historyViewableDays().findIndex((day) => day.dayID === dayID);
+
+  if (dayIndex < 0) {
+    return false;
+  }
+
+  const nextPageIndex = Math.floor(dayIndex / HISTORY_PAGE_SIZE);
+
+  if (nextPageIndex !== historyPageIndex) {
+    historyPageIndex = nextPageIndex;
+
+    if (!options.skipRender && currentHistoryState?.available) {
+      renderHistoryState(currentHistoryState);
+    }
+  }
+
+  return true;
+}
+
+function isHistoryDayViewable(dayID) {
+  return historyViewableDays().some((day) => day.dayID === dayID);
+}
+
+function historyStatusText(totalDays) {
+  if (totalDays > HISTORY_MAX_VISIBLE_DAYS) {
+    return historyLimitedStatusText(totalDays);
+  }
+
+  const countCopy = totalDays === 1 ? "1 day with saved entries." : `${totalDays} days with saved entries.`;
+  return historyPageCount() > 1 ? `${countCopy} Page ${historyPageIndex + 1} of ${historyPageCount()}.` : countCopy;
+}
+
+function historyLimitedStatusText(totalDays) {
+  return `${HISTORY_MAX_VISIBLE_DAYS} of ${totalDays} days with saved entries are viewable here. Only the most recent ${HISTORY_MAX_VISIBLE_DAYS} days are shown in History.`;
+}
+
+function renderHistoryPagination() {
+  replaceChildren(historyPagination);
+
+  if (!currentHistoryState?.available || !currentHistoryState.days?.length) {
+    return;
+  }
+
+  const pageCount = historyPageCount();
+  const totalDays = currentHistoryState.days.length;
+
+  if (pageCount <= 1 && totalDays <= HISTORY_MAX_VISIBLE_DAYS) {
+    return;
+  }
+
+  const notice = document.createElement("p");
+  notice.className = "note";
+  setText(notice, totalDays > HISTORY_MAX_VISIBLE_DAYS
+    ? `Only the most recent ${HISTORY_MAX_VISIBLE_DAYS} days are viewable in History. Export a backup to keep the full record.`
+    : `Page ${historyPageIndex + 1} of ${pageCount}.`);
+  historyPagination?.append(notice);
+
+  if (pageCount <= 1) {
+    return;
+  }
+
+  const controls = document.createElement("div");
+  const previous = document.createElement("button");
+  const next = document.createElement("button");
+  controls.className = "history-pagination-controls";
+  previous.type = "button";
+  previous.className = "secondary-action compact-action";
+  previous.dataset.historyPage = "previous";
+  previous.disabled = historyPageIndex === 0;
+  setText(previous, "Previous");
+  next.type = "button";
+  next.className = "secondary-action compact-action";
+  next.dataset.historyPage = "next";
+  next.disabled = historyPageIndex >= pageCount - 1;
+  setText(next, "Next");
+  controls.append(previous, next);
+  historyPagination?.append(controls);
+}
+
 function renderHistoryDayCard(day) {
   const fragment = historyDayTemplate?.content.firstElementChild.cloneNode(true);
   const card = fragment || document.createElement("article");
@@ -1173,6 +1329,7 @@ function renderHistoryDayCard(day) {
   setText(summaryNode, historyDaySummary(day));
   card.classList.toggle("is-selected", day.dayID === historySelectedDayID);
   button.setAttribute("aria-current", day.dayID === historySelectedDayID ? "true" : "false");
+  button.setAttribute("aria-expanded", day.dayID === historySelectedDayID ? "true" : "false");
 
   return card;
 }
@@ -1204,8 +1361,15 @@ function markSelectedHistoryDay(dayID) {
   historyList?.querySelectorAll(".history-day-card").forEach((card) => {
     const selected = card.dataset.dayId === dayID;
     card.classList.toggle("is-selected", selected);
-    card.querySelector("[data-history-day]")?.setAttribute("aria-current", selected ? "true" : "false");
+    const button = card.querySelector("[data-history-day]");
+    button?.setAttribute("aria-current", selected ? "true" : "false");
+    button?.setAttribute("aria-expanded", selected ? "true" : "false");
   });
+}
+
+function historyCardForDay(dayID) {
+  return Array.from(historyList?.querySelectorAll(".history-day-card") || [])
+    .find((card) => card.dataset.dayId === dayID) || null;
 }
 
 function renderHistoryWeight(weight, isEditable) {

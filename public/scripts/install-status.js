@@ -1,17 +1,17 @@
-export const CURRENT_CACHE_NAME = "food-body-log-shell-v10";
+export const CURRENT_CACHE_NAME = "food-body-log-shell-v11";
 
 export const EXPECTED_SHELL_ASSETS = [
   "./",
   "./index.html",
   "./styles/app.css",
-  "./scripts/app.js?v=9",
+  "./scripts/app.js?v=10",
   "./scripts/paths.js",
   "./scripts/storage.js",
   "./scripts/dom.js",
   "./scripts/day-policy.js",
   "./scripts/tracking-model.js?v=3",
   "./scripts/today-tracking.js?v=4",
-  "./scripts/install-status.js?v=9",
+  "./scripts/install-status.js?v=10",
   "./scripts/plan-suggestions-ui.js?v=4",
   "./scripts/journal-model.js?v=2",
   "./scripts/journal-tracking.js?v=2",

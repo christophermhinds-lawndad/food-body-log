@@ -66,6 +66,13 @@ Use this checklist during `$gsd-verify-work` to validate the final Phase 6 backu
 - Expected: primary controls remain reachable, text remains legible, dynamic/user-authored text wraps, and the fixed bottom tab bar does not hide the active content.
 - Result status: pending manual verification.
 
+### History Accordion Pagination
+
+- Setup: import or create more than 15 days of saved entries, including weight, meals, reflections, and breakthroughs.
+- Steps: open History, expand date rows, and use Previous/Next page controls.
+- Expected: each visible date behaves as an accordion with that day's details inside the selected row. History renders 5 days per page, exposes no more than the most recent 15 days across 3 pages, and shows a notice that only the most recent 15 days are viewable in History.
+- Result status: pending manual verification.
+
 ### Safety And Tone Pass
 
 - Setup: use sparse data, partial days, skipped meals, invalid backup input, unsupported backup input, and read-only History days.

@@ -526,6 +526,7 @@ p {
 
 .history-view,
 .history-list,
+.history-pagination,
 .day-detail,
 [data-history-meal-list],
 [data-history-answer-list] {
@@ -536,6 +537,16 @@ p {
 
 .history-list {
   gap: 16px;
+}
+
+.history-pagination {
+  gap: 8px;
+}
+
+.history-pagination-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .history-day-card,
@@ -553,6 +564,14 @@ p {
 .history-day-card.is-selected {
   border-color: var(--accent);
   box-shadow: inset 4px 0 0 var(--accent);
+}
+
+.history-day-card .day-detail {
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
 }
 
 .history-day-button {
@@ -960,6 +979,8 @@ p {
   .journal-prompt-card,
   .breakthrough-card,
   .history-list,
+  .history-pagination,
+  .history-pagination-controls,
   .day-detail,
   .history-detail-section,
   .history-chip-list,
@@ -987,6 +1008,8 @@ p {
   }
 
   .history-list,
+  .history-pagination,
+  .history-pagination-controls,
   .day-detail,
   .history-detail-section,
   .history-chip-list,

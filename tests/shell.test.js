@@ -18,7 +18,7 @@ test("shell markup exposes all tabs with Today active by default", () => {
 
 test("shell uses relative app assets and install metadata", () => {
   assert.match(html, /href="\.\/styles\/app\.css"/);
-  assert.match(html, /src="\.\/scripts\/app\.js\?v=9"/);
+  assert.match(html, /src="\.\/scripts\/app\.js\?v=10"/);
   assert.match(html, /type="module"/);
   assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
   assert.match(html, /rel="apple-touch-icon" href="\.\/icons\/apple-touch-icon\.png"/);
@@ -99,6 +99,7 @@ test("history shell exposes browse detail and edit containers", () => {
   assert.match(html, /data-view="history"/);
   assert.match(html, /id="history-status" class="status-message" aria-live="polite"/);
   assert.match(html, /id="history-list" class="history-list" aria-live="polite"/);
+  assert.match(html, /id="history-pagination" class="history-pagination" aria-live="polite"/);
   assert.match(html, /id="history-detail" class="day-detail" hidden/);
   assert.match(html, /id="history-detail-title" tabindex="-1"/);
   assert.match(html, /id="history-save-message" class="status-message" aria-live="polite"/);

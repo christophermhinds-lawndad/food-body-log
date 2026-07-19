@@ -127,6 +127,7 @@ test("history shell exposes browse detail edit containers and templates", () => 
   for (const expected of [
     'id="history-status"',
     'id="history-list"',
+    'id="history-pagination"',
     'id="history-detail"',
     'id="history-detail-title"',
     'id="history-save-message"',
@@ -156,6 +157,8 @@ test("history controller loads repository state, guards stale selected days, and
     "loadSelectedHistoryDay",
     "renderHistoryState",
     "renderHistoryDayDetail",
+    "changeHistoryPage",
+    "historyPageDays",
     "saveSelectedHistoryDay",
     "serializeHistoryDraft",
     "openHistorySourceDay",
@@ -166,7 +169,13 @@ test("history controller loads repository state, guards stale selected days, and
   assert.match(appSource, /if\s*\(\s*tabName === "history"\s*\)[\s\S]*loadHistoryView\(\)/);
   assert.match(appSource, /historyLoadRequestID/);
   assert.match(appSource, /historyDayLoadRequestID/);
+  assert.match(appSource, /const HISTORY_PAGE_SIZE = 5;/);
+  assert.match(appSource, /const HISTORY_MAX_VISIBLE_DAYS = 15;/);
   assert.match(appSource, /requestID !== historyDayLoadRequestID/);
+  assert.match(appSource, /historyList\?\.querySelectorAll\("\.history-day-card"\)/);
+  assert.match(appSource, /selectedCard\.append\(historyDetail\)/);
+  assert.match(appSource, /button\.setAttribute\("aria-expanded", day\.dayID === historySelectedDayID \? "true" : "false"\)/);
+  assert.match(appSource, /Only the most recent \$\{HISTORY_MAX_VISIBLE_DAYS\} days are viewable in History/);
   assert.match(appSource, /setText\([^)]*HISTORY_COPY\.sourceDayOpened/);
   assert.doesNotMatch(historyControllerSlice(), /\b(savePlan|saveMealLog|saveWeight|saveReflection|ensureDay|ensureMealsForDay)\s*\(/);
 });
@@ -188,6 +197,8 @@ test("history draft serialization omits blank weight when no weight exists", () 
 test("history styles provide required mobile-safe selectors and wrapping backstops", () => {
   for (const selector of [
     ".history-list",
+    ".history-pagination",
+    ".history-pagination-controls",
     ".history-day-card",
     ".history-day-card.is-selected",
     ".day-detail",
@@ -202,10 +213,12 @@ test("history styles provide required mobile-safe selectors and wrapping backsto
   assert.match(css, /\.history-day-card,[\s\S]*\.day-detail,[\s\S]*\.history-detail-section[\s\S]*border-radius: 8px;[\s\S]*background: var\(--surface\);/);
   assert.match(css, /\.history-day-button[\s\S]*min-height: 44px;[\s\S]*text-align: left;/);
   assert.match(css, /\.history-day-card\.is-selected[\s\S]*border-color: var\(--accent\);[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\);/);
+  assert.match(css, /\.history-day-card \.day-detail[\s\S]*border-top: 1px solid var\(--border\);[\s\S]*background: transparent;/);
+  assert.match(css, /\.history-pagination-controls[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(css, /\.editable-badge,[\s\S]*\.read-only-badge[\s\S]*min-height: 32px;[\s\S]*border-radius: 8px;[\s\S]*font-size: 13px;/);
   assert.match(css, /\.history-day-summary,[\s\S]*\.history-detail-section p,[\s\S]*\.history-value-row,[\s\S]*\.history-value-row p,[\s\S]*overflow-wrap: anywhere;/);
   assert.match(css, /390px iPhone history overflow backstop/);
-  assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.history-list,[\s\S]*\.day-detail,[\s\S]*\.history-detail-section,[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.history-list,[\s\S]*\.history-pagination,[\s\S]*\.history-pagination-controls,[\s\S]*\.day-detail,[\s\S]*\.history-detail-section,[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
 });
 
 test("history styles extend focus-visible coverage and avoid destructive controls", () => {
