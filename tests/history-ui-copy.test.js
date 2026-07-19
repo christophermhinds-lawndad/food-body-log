@@ -4,6 +4,8 @@ import test from "node:test";
 
 const historyReportsSource = await readFile(new URL("../public/scripts/history-reports.js", import.meta.url), "utf8");
 const historyReportsTests = await readFile(new URL("./history-reports.test.js", import.meta.url), "utf8");
+const appSource = await readFile(new URL("../public/scripts/app.js", import.meta.url), "utf8");
+const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
 
 const requiredExports = [
   "getHistoryState",
@@ -109,3 +111,73 @@ test("copy guard scopes forbidden checks to the History Reports repository", () 
   assert.match(historyReportsSource, /from "\.\/journal-model\.js\?v=2"/);
   assert.doesNotMatch(historyReportsSource, /\.innerHTML\s*=|insertAdjacentHTML\s*\(|outerHTML\s*=/);
 });
+
+test("history shell exposes browse detail edit containers and templates", () => {
+  for (const expected of [
+    'id="history-status"',
+    'id="history-list"',
+    'id="history-detail"',
+    'id="history-detail-title"',
+    'id="history-save-message"',
+    "data-history-day-template",
+    "data-history-meal-template",
+    "data-history-answer-template",
+    "Save day",
+    "Read-only",
+    "Editable",
+  ]) {
+    assert.match(html, new RegExp(escapeRegExp(expected)), `missing History shell artifact ${expected}`);
+  }
+
+  assert.doesNotMatch(historyPanelHtml(), /disabled[^>]+(?:Save day|history)|(?:Save day|history)[^>]+disabled/i);
+  assert.doesNotMatch(historyPanelHtml(), />\s*(?:Delete|Reset|Export|Import)\b/i);
+});
+
+test("history controller loads repository state, guards stale selected days, and saves through saveHistoryDay only", () => {
+  assert.match(appSource, /from "\.\/history-reports\.js\?v=\d+"/);
+
+  for (const symbol of [
+    "HISTORY_COPY",
+    "getHistoryState",
+    "getHistoryDay",
+    "saveHistoryDay",
+    "loadHistoryView",
+    "loadSelectedHistoryDay",
+    "renderHistoryState",
+    "renderHistoryDayDetail",
+    "saveSelectedHistoryDay",
+    "serializeHistoryDraft",
+    "openHistorySourceDay",
+  ]) {
+    assert.match(appSource, new RegExp(`\\b${symbol}\\b`), `missing controller symbol ${symbol}`);
+  }
+
+  assert.match(appSource, /if\s*\(\s*tabName === "history"\s*\)[\s\S]*loadHistoryView\(\)/);
+  assert.match(appSource, /historyLoadRequestID/);
+  assert.match(appSource, /historyDayLoadRequestID/);
+  assert.match(appSource, /requestID !== historyDayLoadRequestID/);
+  assert.match(appSource, /setText\([^)]*HISTORY_COPY\.sourceDayOpened/);
+  assert.doesNotMatch(historyControllerSlice(), /\b(savePlan|saveMealLog|saveWeight|saveReflection|ensureDay|ensureMealsForDay)\s*\(/);
+});
+
+test("history dynamic rendering uses text-safe sinks and form values instead of html injection", () => {
+  assert.doesNotMatch(historyControllerSlice(), /\.innerHTML\s*=|insertAdjacentHTML\s*\(|outerHTML\s*=/);
+  assert.match(historyControllerSlice(), /document\.createElement\(/);
+  assert.match(historyControllerSlice(), /\.content\.firstElementChild\.cloneNode\(true\)/);
+  assert.match(historyControllerSlice(), /setText\(/);
+  assert.match(historyControllerSlice(), /\.value\s*=/);
+});
+
+function historyPanelHtml() {
+  return html.match(/<section class="view-panel[^"]*" data-view="history"[\s\S]*?<\/section>/)?.[0] || "";
+}
+
+function historyControllerSlice() {
+  const start = appSource.indexOf("async function loadHistoryView");
+  const end = appSource.indexOf("async function saveTodayWeight");
+  return start >= 0 && end > start ? appSource.slice(start, end) : "";
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
