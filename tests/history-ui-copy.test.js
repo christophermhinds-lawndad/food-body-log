@@ -258,6 +258,39 @@ test("reports controller loads local DTOs and renders fixed sparse-safe tiles", 
   assert.doesNotMatch(reportsControllerSlice(), /\b(savePlan|saveMealLog|saveWeight|saveReflection|saveHistoryDay|fetch|XMLHttpRequest)\s*\(/);
 });
 
+test("reports styles provide numeric tile selectors and 390px wrapping backstops", () => {
+  for (const selector of [
+    ".reports-view",
+    ".reports-section",
+    ".reports-grid",
+    ".report-card",
+    ".report-label",
+    ".report-value",
+    ".report-denominator",
+    ".report-state",
+  ]) {
+    assert.match(css, new RegExp(escapeRegExp(selector)), `missing ${selector} styles`);
+  }
+
+  assert.match(css, /\.report-card[\s\S]*border-radius: 8px;[\s\S]*background: var\(--surface\);/);
+  assert.match(css, /\.report-value[\s\S]*font-size: 16px;[\s\S]*font-weight: 600;[\s\S]*line-height: 1\.5;/);
+  assert.doesNotMatch(css, /\.report-value[\s\S]*font-size: (?:20px|28px);/);
+  assert.match(css, /\.report-card h3,[\s\S]*\.report-label,[\s\S]*\.report-value,[\s\S]*\.report-denominator,[\s\S]*\.report-state[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(css, /reports overflow backstop/);
+  assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.reports-view,[\s\S]*\.reports-section,[\s\S]*\.reports-grid,[\s\S]*\.report-card[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
+});
+
+test("reports surface stays numeric-only with no visualizations framing or network calls", () => {
+  const forbiddenReportsCopy = /\b(?:trend|trending|improving|worsening|on track|off track|goal|target|success|failure|streak|perfect|cheat|bad food|good food|calories|macros|diet|weight-loss advice|medical advice)\b/i;
+  const forbiddenReportSource = /\b(?:fetch|XMLHttpRequest|sendBeacon|canvas|svg|chart|sparkline|trendline|heatmap|delta|goal|target|red|green)\b/i;
+
+  assert.doesNotMatch(reportsPanelHtml(), /<canvas\b|<svg\b|<table\b/i);
+  assert.doesNotMatch(reportsPanelHtml(), forbiddenReportsCopy);
+  assert.doesNotMatch(reportsControllerSlice(), forbiddenReportSource);
+  assert.doesNotMatch(css, /\.report-[^{]*(?:red|green|delta|trend|goal|comparison)/i);
+  assert.doesNotMatch(historyReportsSource, /\b(?:fetch|XMLHttpRequest|sendBeacon|https?:\/\/|analytics|backend|api\/)\b/i);
+});
+
 function historyPanelHtml() {
   const start = html.indexOf('data-view="history"');
   const end = html.indexOf('data-view="settings"', start);

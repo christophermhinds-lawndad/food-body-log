@@ -636,6 +636,57 @@ p {
   gap: 8px;
 }
 
+.reports-view,
+.reports-section,
+.reports-grid {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.reports-section {
+  gap: 16px;
+}
+
+.reports-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.report-card {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.report-card h3,
+.report-label,
+.report-value,
+.report-denominator,
+.report-state {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.report-label,
+.report-denominator,
+.report-state {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.report-value {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .button-row:has([data-unskip-meal]:not([hidden])) {
   grid-template-columns: 1fr;
 }
@@ -754,14 +805,22 @@ p {
   .meal-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .reports-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 430px) {
-  /* 390px iPhone history overflow backstop */
+  /* 390px iPhone history overflow backstop and reports overflow backstop */
   .history-list,
   .day-detail,
   .history-detail-section,
-  .history-chip-list {
+  .history-chip-list,
+  .reports-view,
+  .reports-section,
+  .reports-grid,
+  .report-card {
     grid-template-columns: minmax(0, 1fr);
   }
 

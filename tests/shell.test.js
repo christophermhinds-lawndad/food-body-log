@@ -153,6 +153,25 @@ test("journal controls share the existing focus-visible treatment", () => {
   }
 });
 
+test("reports styling uses compact numeric cards without display-scale values", () => {
+  for (const selector of [
+    ".reports-view",
+    ".reports-section",
+    ".reports-grid",
+    ".report-card",
+    ".report-value",
+    ".report-denominator",
+    ".report-state",
+  ]) {
+    assert.match(css, new RegExp(escapeRegExp(selector)), `missing ${selector} styles`);
+  }
+
+  assert.match(css, /\.report-card[\s\S]*border-radius: 8px;[\s\S]*background: var\(--surface\);/);
+  assert.match(css, /\.report-value[\s\S]*font-size: 16px;[\s\S]*font-weight: 600;/);
+  assert.match(css, /reports overflow backstop/);
+  assert.doesNotMatch(css, /\.report-[^{]*(?:red|green|delta|trend|goal|comparison)/i);
+});
+
 test("plan suggestion styling is compact, touch-friendly, and wrapping-safe", () => {
   assert.match(css, /\.plan-suggestions\s*\{[\s\S]*display: grid;[\s\S]*gap: 8px;[\s\S]*\}/);
   assert.match(css, /\.plan-suggestion-option\s*\{[\s\S]*min-height: 44px;[\s\S]*padding: 8px;[\s\S]*border-radius: 8px;[\s\S]*font-size: 16px;[\s\S]*overflow-wrap: anywhere;[\s\S]*\}/);

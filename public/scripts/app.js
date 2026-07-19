@@ -455,17 +455,17 @@ function renderMealReportTile(tile) {
 }
 
 function renderReportTile(card, tile) {
-  const target = card || reportTileTemplate?.content?.firstElementChild?.cloneNode(true);
+  const reportNode = card || reportTileTemplate?.content?.firstElementChild?.cloneNode(true);
 
-  if (!target) {
+  if (!reportNode) {
     return;
   }
 
-  setText(target.querySelector("[data-report-title]"), tile.title);
-  setText(target.querySelector("[data-report-label]"), tile.label);
-  setText(target.querySelector("[data-report-value]"), tile.value);
-  setText(target.querySelector("[data-report-denominator]"), tile.denominator);
-  setText(target.querySelector("[data-report-state]"), tile.state);
+  setText(reportNode.querySelector("[data-report-title]"), tile.title);
+  setText(reportNode.querySelector("[data-report-label]"), tile.label);
+  setText(reportNode.querySelector("[data-report-value]"), tile.value);
+  setText(reportNode.querySelector("[data-report-denominator]"), tile.denominator);
+  setText(reportNode.querySelector("[data-report-state]"), tile.state);
 }
 
 function reportValueText(tile) {
