@@ -255,6 +255,22 @@ function seedWeight(db, dayID, value) {
   });
 }
 
+function seedWeightRange(db, startOffset, endOffset, value) {
+  for (let offset = startOffset; offset <= endOffset; offset += 1) {
+    seedWeight(db, dayIDFromOffset(offset), value);
+  }
+}
+
+function dayIDFromOffset(offset) {
+  const date = new Date(FIXED_NOW);
+  date.setDate(date.getDate() + offset);
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
 function seedAnswer(db, dayID, promptID, overrides = {}) {
   seedRecord(db, "journalAnswers", {
     id: `${dayID}:journal:${promptID}`,
@@ -448,13 +464,13 @@ test("reports expose trailing weight averages and sparse meal metric states", as
   ], "ateWhenHungry", { now: FIXED_NOW });
   const state = await historyReports.getReportsState({ now: FIXED_NOW });
 
-  assert.deepEqual(noWeight.map((summary) => summary.state), ["NoData", "NoData", "NoData"]);
+  assert.deepEqual(noWeight.map((summary) => summary.state), ["NoData", "NotEnoughData", "NotEnoughData"]);
   assert.equal(oneMeal.state, "Insufficient");
   assert.equal(oneMeal.percentage, null);
   assert.deepEqual(state.weightAverages.map((summary) => [summary.windowDays, summary.state, summary.count, summary.average]), [
     [7, "Ready", 3, 183.3],
-    [30, "Ready", 4, 182],
-    [90, "Ready", 4, 182],
+    [30, "NotEnoughData", 4, null],
+    [90, "NotEnoughData", 4, null],
   ]);
   assert.deepEqual(state.weightAverages.map((summary) => summary.periodLabel), [
     "Trailing 7 days",
@@ -467,6 +483,56 @@ test("reports expose trailing weight averages and sparse meal metric states", as
   ]);
   assert.equal(historyReports.formatWeightAverage(182), "182");
   assert.equal(historyReports.formatWeightAverage(183.3), "183.3");
+});
+
+test("weight report summary emits comparison narratives and threshold notices", async () => {
+  const progressing = await loadModules("reports-progressing");
+  seedWeightRange(progressing.db, -89, -30, 205.5);
+  seedWeightRange(progressing.db, -29, -14, 198.85);
+  seedWeightRange(progressing.db, -13, -7, 191.2);
+  seedWeightRange(progressing.db, -6, 0, 190);
+
+  const progressingState = await progressing.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.deepEqual(progressingState.weightAverages.map((summary) => [summary.windowDays, summary.state, summary.average]), [
+    [7, "Ready", 190],
+    [30, "Ready", 195],
+    [90, "Ready", 202],
+  ]);
+  assert.equal(progressingState.weightSummary.notice.kind, "Progressing");
+  assert.equal(progressingState.weightSummary.notice.text, "Progressing: Data shows sustainable weight loss.");
+  assert.match(progressingState.weightSummary.lines[0], /lower than your 7 day trailing average from a week ago by 1\.2 pounds, 0\.6% of mass\./);
+  assert.match(progressingState.weightSummary.lines[1], /lost 5 pounds, 2\.6% of total mass, compared to the trailing 30 day average/);
+  assert.match(progressingState.weightSummary.lines[1], /lost 12 pounds, 5\.9% of total mass, compared to the 90 day average\./);
+
+  const considerMore = await loadModules("reports-consider-more");
+  seedWeightRange(considerMore.db, -89, -30, 214);
+  seedWeightRange(considerMore.db, -29, -14, 214);
+  seedWeightRange(considerMore.db, -13, -7, 205);
+  seedWeightRange(considerMore.db, -6, 0, 190);
+
+  const considerMoreState = await considerMore.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.equal(considerMoreState.weightSummary.notice.kind, "ConsiderEatingMore");
+  assert.equal(considerMoreState.weightSummary.notice.text, "Consider Eating More: Current weight loss may trigger strong homeostatic response.");
+
+  const reflect = await loadModules("reports-reflect");
+  seedWeightRange(reflect.db, -89, -30, 200);
+  seedWeightRange(reflect.db, -29, -14, 199);
+  seedWeightRange(reflect.db, -13, -7, 200);
+  seedWeightRange(reflect.db, -6, 0, 204);
+
+  const reflectState = await reflect.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.equal(reflectState.weightSummary.notice.kind, "Reflect");
+  assert.equal(reflectState.weightSummary.notice.text, "Reflect: Data shows meaningful weight gain across some periods.");
+
+  const stable = await loadModules("reports-stable");
+  seedWeightRange(stable.db, -89, -30, 190);
+  seedWeightRange(stable.db, -29, -14, 190);
+  seedWeightRange(stable.db, -13, -7, 190);
+  seedWeightRange(stable.db, -6, 0, 190);
+
+  const stableState = await stable.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.equal(stableState.weightSummary.notice.kind, "Stable");
+  assert.equal(stableState.weightSummary.notice.text, "Weight Stable: Weight is not moving up or down. If you want to maintain this as baseline, no changes are needed.");
 });
 
 test("history reports repository returns neutral unavailable results without IndexedDB", async () => {

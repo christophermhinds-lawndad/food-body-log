@@ -1,7 +1,7 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=6";
+import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=7";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
 import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=4";
@@ -42,6 +42,8 @@ const breakthroughMessage = document.querySelector("#breakthrough-message");
 const journalPromptTemplate = document.querySelector("[data-journal-prompt-template]");
 const breakthroughTemplate = document.querySelector("[data-breakthrough-template]");
 const reportsStatus = document.querySelector("#reports-status");
+const weightSummaryNotice = document.querySelector("#weight-summary-notice");
+const weightSummaryLines = document.querySelector("#weight-summary-lines");
 const weightReports = document.querySelector("#weight-reports");
 const mealReports = document.querySelector("#meal-reports");
 const reportTileTemplate = document.querySelector("[data-report-tile-template]");
@@ -393,14 +395,40 @@ async function loadReportsView() {
 function renderReportsState(state) {
   if (!state.available) {
     setText(reportsStatus, REPORTS_COPY.error);
+    renderWeightSummary(null);
     renderWeightReportTiles([]);
     renderMealReportTiles([]);
     return;
   }
 
   setText(reportsStatus, "");
+  renderWeightSummary(state.weightSummary);
   renderWeightReportTiles(state.weightAverages || []);
   renderMealReportTiles(state.mealMetrics || []);
+}
+
+function renderWeightSummary(summary) {
+  const notice = summary?.notice || {
+    kind: "NoData",
+    text: REPORTS_COPY.weightSummaryNoData,
+  };
+  const lines = Array.isArray(summary?.lines) && summary.lines.length > 0
+    ? summary.lines
+    : [REPORTS_COPY.weightSummaryNoData];
+
+  if (weightSummaryNotice) {
+    weightSummaryNotice.className = `weight-summary-notice ${weightNoticeClass(notice.kind)}`;
+    setText(weightSummaryNotice, notice.text);
+  }
+
+  replaceChildren(weightSummaryLines);
+
+  for (const line of lines) {
+    const item = document.createElement("p");
+    item.className = "weight-summary-line";
+    setText(item, line);
+    weightSummaryLines?.append(item);
+  }
 }
 
 function renderWeightReportTiles(weightAverages) {
@@ -470,7 +498,11 @@ function renderReportTile(card, tile) {
 
 function reportValueText(tile) {
   if (Object.hasOwn(tile, "average")) {
-    return tile.state === "Ready" ? (tile.formattedAverage || String(tile.average)) : REPORTS_COPY.weightNoData;
+    if (tile.state === "Ready") {
+      return tile.formattedAverage || String(tile.average);
+    }
+
+    return tile.state === "NotEnoughData" ? REPORTS_COPY.weightNotEnoughData : REPORTS_COPY.weightNoData;
   }
 
   if (tile.state === "Ready") {
@@ -500,6 +532,22 @@ function reportDenominatorText(tile) {
   }
 
   return denominator === 1 ? "1 logged non-skipped meal in this period." : `${denominator} logged non-skipped meals in this period.`;
+}
+
+function weightNoticeClass(kind) {
+  if (kind === "Reflect") {
+    return "is-reflect";
+  }
+
+  if (kind === "Progressing") {
+    return "is-progressing";
+  }
+
+  if (kind === "ConsiderEatingMore") {
+    return "is-consider-more";
+  }
+
+  return "is-stable";
 }
 
 async function loadJournalView() {

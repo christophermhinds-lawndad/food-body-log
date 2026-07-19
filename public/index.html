@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
     <link rel="stylesheet" href="./styles/app.css">
-    <script type="module" src="./scripts/app.js?v=6"></script>
+    <script type="module" src="./scripts/app.js?v=7"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -192,6 +192,11 @@
             <p class="note">Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.</p>
           </div>
           <p id="reports-status" class="status-message" aria-live="polite">Loading reports...</p>
+          <section class="weight-summary" aria-labelledby="weight-summary-title">
+            <h2 id="weight-summary-title">Weight summary</h2>
+            <p id="weight-summary-notice" class="weight-summary-notice is-stable" data-weight-summary-notice>Weight Stable: Weight is not moving up or down. If you want to maintain this as baseline, no changes are needed.</p>
+            <div id="weight-summary-lines" class="weight-summary-lines" aria-live="polite"></div>
+          </section>
           <section class="reports-section" aria-labelledby="weight-reports-title">
             <h2 id="weight-reports-title">Weight averages</h2>
             <div id="weight-reports" class="reports-grid" aria-live="polite">

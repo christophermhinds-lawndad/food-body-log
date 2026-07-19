@@ -10,14 +10,14 @@ const requiredShellAssets = [
   "./",
   "./index.html",
   "./styles/app.css",
-  "./scripts/app.js?v=6",
+  "./scripts/app.js?v=7",
   "./scripts/paths.js",
   "./scripts/storage.js",
   "./scripts/dom.js",
   "./scripts/day-policy.js",
   "./scripts/tracking-model.js?v=3",
   "./scripts/today-tracking.js?v=4",
-  "./scripts/install-status.js?v=6",
+  "./scripts/install-status.js?v=7",
   "./scripts/plan-suggestions-ui.js?v=4",
   "./scripts/journal-model.js?v=2",
   "./scripts/journal-tracking.js?v=2",
@@ -57,7 +57,7 @@ test("service worker exposes current cache name and complete app-shell asset lis
 });
 
 test("service worker cache list matches install-status expected shell assets", () => {
-  assert.equal(CURRENT_CACHE_NAME, "food-body-log-shell-v7");
+  assert.equal(CURRENT_CACHE_NAME, "food-body-log-shell-v8");
   assert.deepEqual(EXPECTED_SHELL_ASSETS, requiredShellAssets);
 });
 

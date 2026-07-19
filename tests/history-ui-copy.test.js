@@ -15,6 +15,7 @@ const requiredExports = [
   "saveHistoryDay",
   "getReportsState",
   "summarizeWeightAverages",
+  "summarizeWeightChange",
   "summarizeMealMetric",
   "isHistoryListableDay",
   "formatWeightAverage",
@@ -53,6 +54,14 @@ const requiredReportsCopy = [
   "Trailing 90 days",
   "Based on {count} weight entry/entries in this period.",
   "No weight data for this period.",
+  "Not Enough Data Yet",
+  "Add a weight entry to begin weight summaries.",
+  "Not enough data yet to compare your current trailing 7 day average with the prior trailing 7 day average.",
+  "Not enough data yet to compare your current trailing 7 day average with trailing 30 and 90 day averages.",
+  "Reflect: Data shows meaningful weight gain across some periods.",
+  "Progressing: Data shows sustainable weight loss.",
+  "Consider Eating More: Current weight loss may trigger strong homeostatic response.",
+  "Weight Stable: Weight is not moving up or down. If you want to maintain this as baseline, no changes are needed.",
   "Meal metrics",
   "Ate when hungry",
   "Stopped at enough",
@@ -218,6 +227,8 @@ test("reports shell exposes fixed numeric groups and tile template", () => {
     "data-report-tile-template",
     "Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.",
     "Weight averages",
+    "Weight summary",
+    "Weight Stable: Weight is not moving up or down. If you want to maintain this as baseline, no changes are needed.",
     "Meal metrics",
     "Trailing 7 days",
     "Trailing 30 days",
@@ -238,10 +249,12 @@ test("reports controller loads local DTOs and renders fixed sparse-safe tiles", 
     "getReportsState",
     "loadReportsView",
     "renderReportsState",
+    "renderWeightSummary",
     "renderWeightReportTile",
     "renderMealReportTile",
     "reportValueText",
     "reportDenominatorText",
+    "weightNoticeClass",
   ]) {
     assert.match(appSource, new RegExp(`\\b${symbol}\\b`), `missing controller symbol ${symbol}`);
   }
@@ -250,8 +263,10 @@ test("reports controller loads local DTOs and renders fixed sparse-safe tiles", 
   assert.match(appSource, /reportsLoadRequestID/);
   assert.match(appSource, /requestID !== reportsLoadRequestID/);
   assert.match(reportsControllerSlice(), /state\.weightAverages/);
+  assert.match(reportsControllerSlice(), /state\.weightSummary/);
   assert.match(reportsControllerSlice(), /state\.mealMetrics/);
   assert.match(reportsControllerSlice(), /REPORTS_COPY\.weightNoData/);
+  assert.match(reportsControllerSlice(), /REPORTS_COPY\.weightNotEnoughData/);
   assert.match(reportsControllerSlice(), /REPORTS_COPY\.mealNoData/);
   assert.match(reportsControllerSlice(), /REPORTS_COPY\.mealInsufficient/);
   assert.match(reportsControllerSlice(), /setText\(/);
@@ -262,6 +277,10 @@ test("reports controller loads local DTOs and renders fixed sparse-safe tiles", 
 test("reports styles provide numeric tile selectors and 390px wrapping backstops", () => {
   for (const selector of [
     ".reports-view",
+    ".weight-summary",
+    ".weight-summary-notice",
+    ".weight-summary-lines",
+    ".weight-summary-line",
     ".reports-section",
     ".reports-grid",
     ".report-card",
@@ -274,6 +293,9 @@ test("reports styles provide numeric tile selectors and 390px wrapping backstops
   }
 
   assert.match(css, /\.report-card[\s\S]*border-radius: 8px;[\s\S]*background: var\(--surface\);/);
+  assert.match(css, /\.weight-summary-notice[\s\S]*border-radius: 8px;[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(css, /\.weight-summary-notice\.is-progressing[\s\S]*border-color: var\(--accent\);/);
+  assert.match(css, /\.weight-summary-notice\.is-reflect,[\s\S]*\.weight-summary-notice\.is-consider-more[\s\S]*border-color: var\(--destructive\);/);
   assert.match(css, /\.report-value[\s\S]*font-size: 16px;[\s\S]*font-weight: 600;[\s\S]*line-height: 1\.5;/);
   assert.doesNotMatch(css, /\.report-value[\s\S]*font-size: (?:20px|28px);/);
   assert.match(css, /\.report-card h3,[\s\S]*\.report-label,[\s\S]*\.report-value,[\s\S]*\.report-denominator,[\s\S]*\.report-state[\s\S]*overflow-wrap: anywhere;/);
@@ -305,9 +327,11 @@ test("Phase 05 UAT names History and Reports manual backstops", () => {
     "history long text wrapping",
     "many-day vertical scrolling",
     "reports no-data state",
+    "reports early weight history state",
     "reports one-usable-meal insufficient state",
     "reports numeric-ready state with denominators",
-    "no chart, trend, goal, or advice presentation",
+    "reports weight summary threshold notices",
+    "no chart, goal, or diet-framing presentation",
     "cache-ready settings status after refresh",
   ]) {
     assert.ok(normalized.includes(snippet), `missing Phase 05 UAT backstop: ${snippet}`);

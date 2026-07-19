@@ -22,6 +22,11 @@ const JOURNAL_ANSWERS_STORE = "journalAnswers";
 const WEIGHT_WINDOWS = Object.freeze([7, 30, 90]);
 const REPORT_MEAL_WINDOW_DAYS = 7;
 const LARGE_WEIGHT_CHANGE_THRESHOLD = 5;
+const WEIGHT_STATUS_THRESHOLDS = Object.freeze({
+  prior7: { sustainableMin: 0.5, sustainableMax: 0.75 },
+  trailing30: { sustainableMin: 2, sustainableMax: 3 },
+  trailing90: { sustainableMin: 5, sustainableMax: 7 },
+});
 const UNAVAILABLE = Object.freeze({
   available: false,
   status: "Unavailable",
@@ -32,6 +37,7 @@ const UNAVAILABLE = Object.freeze({
   answers: [],
   breakthroughs: [],
   weightAverages: [],
+  weightSummary: null,
   mealMetrics: [],
 });
 
@@ -66,6 +72,14 @@ export const REPORTS_COPY = Object.freeze({
   weightNinetyDays: "Trailing 90 days",
   weightDenominator: "Based on {count} weight entry/entries in this period.",
   weightNoData: "No weight data for this period.",
+  weightNotEnoughData: "Not Enough Data Yet",
+  weightSummaryNoData: "Add a weight entry to begin weight summaries.",
+  weightSummaryPriorNoData: "Not enough data yet to compare your current trailing 7 day average with the prior trailing 7 day average.",
+  weightSummaryLongWindowNoData: "Not enough data yet to compare your current trailing 7 day average with trailing 30 and 90 day averages.",
+  weightReflect: "Reflect: Data shows meaningful weight gain across some periods.",
+  weightProgressing: "Progressing: Data shows sustainable weight loss.",
+  weightConsiderMore: "Consider Eating More: Current weight loss may trigger strong homeostatic response.",
+  weightStable: "Weight Stable: Weight is not moving up or down. If you want to maintain this as baseline, no changes are needed.",
   mealHeading: "Meal metrics",
   hungryLabel: "Ate when hungry",
   enoughLabel: "Stopped at enough",
@@ -205,6 +219,7 @@ export async function getReportsState(options = {}) {
     return {
       status: "Ready",
       weightAverages: summarizeWeightAverages(weights, options),
+      weightSummary: summarizeWeightChange(weights, options),
       mealMetrics: [
         summarizeMealMetric(meals, "ateWhenHungry", options),
         summarizeMealMetric(meals, "stoppedAtEnough", options),
@@ -215,22 +230,55 @@ export async function getReportsState(options = {}) {
 
 export function summarizeWeightAverages(weights, options = {}) {
   return WEIGHT_WINDOWS.map((windowDays) => {
-    const windowWeights = filterRecordsInTrailingWindow(weights, windowDays, options)
-      .map((weight) => normalizeWeightValue(weight?.value))
-      .filter((value) => value != null);
-    const average = windowWeights.length > 0
-      ? roundOneDecimal(windowWeights.reduce((sum, value) => sum + value, 0) / windowWeights.length)
-      : null;
+    const summary = averageForTrailingWindow(weights, windowDays, options, {
+      requireFullWindow: windowDays !== 7,
+    });
 
     return {
       windowDays,
       periodLabel: `Trailing ${windowDays} days`,
-      state: windowWeights.length > 0 ? "Ready" : "NoData",
-      count: windowWeights.length,
-      average,
-      formattedAverage: formatWeightAverage(average),
+      state: summary.state,
+      count: summary.count,
+      average: summary.average,
+      formattedAverage: formatWeightAverage(summary.average),
     };
   });
+}
+
+export function summarizeWeightChange(weights, options = {}) {
+  const current7 = averageForTrailingWindow(weights, 7, options);
+  const prior7 = averageForDayRange(weights, addDays(getLocalDayID(options.now || new Date()), -13), addDays(getLocalDayID(options.now || new Date()), -7));
+  const trailing30 = averageForTrailingWindow(weights, 30, options, { requireFullWindow: true });
+  const trailing90 = averageForTrailingWindow(weights, 90, options, { requireFullWindow: true });
+
+  if (current7.state !== "Ready") {
+    return {
+      status: "NoData",
+      notice: createWeightNotice("NoData", REPORTS_COPY.weightSummaryNoData),
+      lines: [REPORTS_COPY.weightSummaryNoData],
+      comparisons: [],
+    };
+  }
+
+  const priorComparison = createWeightComparison("prior7", current7.average, prior7.average);
+  const trailing30Comparison = createWeightComparison("trailing30", current7.average, trailing30.average);
+  const trailing90Comparison = createWeightComparison("trailing90", current7.average, trailing90.average);
+  const comparisons = [priorComparison, trailing30Comparison, trailing90Comparison].filter(Boolean);
+  const lines = [
+    priorComparison
+      ? `Your current trailing 7 day average is ${comparisonPhrase(priorComparison)} your 7 day trailing average from a week ago by ${formatSignedMagnitude(priorComparison.delta)} pounds, ${formatPercent(priorComparison.percent)}% of mass.`
+      : REPORTS_COPY.weightSummaryPriorNoData,
+    trailing30Comparison && trailing90Comparison
+      ? `You have ${gainedLostText(trailing30Comparison)} ${formatSignedMagnitude(trailing30Comparison.delta)} pounds, ${formatPercent(trailing30Comparison.percent)}% of total mass, compared to the trailing 30 day average, and ${gainedLostText(trailing90Comparison)} ${formatSignedMagnitude(trailing90Comparison.delta)} pounds, ${formatPercent(trailing90Comparison.percent)}% of total mass, compared to the 90 day average.`
+      : REPORTS_COPY.weightSummaryLongWindowNoData,
+  ];
+
+  return {
+    status: "Ready",
+    notice: weightNoticeForComparisons(comparisons),
+    lines,
+    comparisons,
+  };
 }
 
 export function summarizeMealMetric(meals, metricName, options = {}) {
@@ -458,10 +506,136 @@ function filterRecordsInTrailingWindow(records, windowDays, options = {}) {
   const endDayID = getLocalDayID(options.now || new Date());
   const startDayID = addDays(endDayID, -windowDays + 1);
 
+  return filterRecordsInDayRange(records, startDayID, endDayID);
+}
+
+function filterRecordsInDayRange(records, startDayID, endDayID) {
   return (Array.isArray(records) ? records : []).filter((record) => {
     const dayID = record?.dayID;
     return dayID >= startDayID && dayID <= endDayID;
   });
+}
+
+function averageForTrailingWindow(weights, windowDays, options = {}, config = {}) {
+  const endDayID = getLocalDayID(options.now || new Date());
+  const startDayID = addDays(endDayID, -windowDays + 1);
+  const validWeights = validWeightRecords(weights);
+
+  if (config.requireFullWindow && !hasBackdatedCoverage(validWeights, startDayID)) {
+    return {
+      state: "NotEnoughData",
+      count: filterRecordsInDayRange(validWeights, startDayID, endDayID).length,
+      average: null,
+    };
+  }
+
+  return averageForDayRange(validWeights, startDayID, endDayID);
+}
+
+function averageForDayRange(weights, startDayID, endDayID) {
+  const values = filterRecordsInDayRange(weights, startDayID, endDayID)
+    .map((weight) => normalizeWeightValue(weight?.value))
+    .filter((value) => value != null);
+  const average = values.length > 0
+    ? roundOneDecimal(values.reduce((sum, value) => sum + value, 0) / values.length)
+    : null;
+
+  return {
+    state: values.length > 0 ? "Ready" : "NoData",
+    count: values.length,
+    average,
+  };
+}
+
+function validWeightRecords(weights) {
+  return (Array.isArray(weights) ? weights : [])
+    .filter((weight) => weight?.dayID && normalizeWeightValue(weight?.value) != null);
+}
+
+function hasBackdatedCoverage(weights, startDayID) {
+  return validWeightRecords(weights).some((weight) => weight.dayID <= startDayID);
+}
+
+function createWeightComparison(id, currentAverage, comparisonAverage) {
+  if (currentAverage == null || comparisonAverage == null || comparisonAverage <= 0) {
+    return null;
+  }
+
+  const delta = roundOneDecimal(currentAverage - comparisonAverage);
+  const percent = roundOneDecimal((delta / comparisonAverage) * 100);
+
+  return {
+    id,
+    currentAverage,
+    comparisonAverage,
+    delta,
+    percent,
+  };
+}
+
+function weightNoticeForComparisons(comparisons) {
+  const evaluable = comparisons.filter((comparison) => Number.isFinite(comparison.percent));
+
+  if (evaluable.some((comparison) => comparison.percent < -WEIGHT_STATUS_THRESHOLDS[comparison.id].sustainableMax)) {
+    return createWeightNotice("ConsiderEatingMore", REPORTS_COPY.weightConsiderMore);
+  }
+
+  if (evaluable.some((comparison) => comparison.percent >= 2)) {
+    return createWeightNotice("Reflect", REPORTS_COPY.weightReflect);
+  }
+
+  if (["prior7", "trailing30", "trailing90"].every((id) => {
+    const comparison = evaluable.find((candidate) => candidate.id === id);
+    const threshold = WEIGHT_STATUS_THRESHOLDS[id];
+    const lossPercent = comparison ? Math.abs(Math.min(comparison.percent, 0)) : null;
+
+    return lossPercent != null
+      && lossPercent >= threshold.sustainableMin
+      && lossPercent <= threshold.sustainableMax;
+  })) {
+    return createWeightNotice("Progressing", REPORTS_COPY.weightProgressing);
+  }
+
+  return createWeightNotice("Stable", REPORTS_COPY.weightStable);
+}
+
+function createWeightNotice(kind, text) {
+  return {
+    kind,
+    text,
+  };
+}
+
+function comparisonPhrase(comparison) {
+  if (comparison.delta > 0) {
+    return "higher than";
+  }
+
+  if (comparison.delta < 0) {
+    return "lower than";
+  }
+
+  return "the same as";
+}
+
+function gainedLostText(comparison) {
+  if (comparison.delta > 0) {
+    return "gained";
+  }
+
+  if (comparison.delta < 0) {
+    return "lost";
+  }
+
+  return "changed by";
+}
+
+function formatSignedMagnitude(value) {
+  return formatWeightAverage(Math.abs(value));
+}
+
+function formatPercent(value) {
+  return formatWeightAverage(Math.abs(value));
 }
 
 function getPriorWeight(db, dayID) {
