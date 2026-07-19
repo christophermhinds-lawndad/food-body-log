@@ -1,7 +1,7 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=8";
+import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=8";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
 import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=4";
@@ -328,10 +328,14 @@ async function readStoredStatus() {
   const stored = await readSetupStatus();
 
   if (stored.available && stored.value) {
+    const offlineCache = stored.value.cacheName === CURRENT_CACHE_NAME
+      ? stored.value.offlineCache || "Not ready"
+      : "Not ready";
+
     renderStatusRows(
       [
         { id: "installMode", value: stored.value.installMode || "Not ready" },
-        { id: "offlineCache", value: stored.value.offlineCache || "Not ready" },
+        { id: "offlineCache", value: offlineCache },
         { id: "storage", value: stored.value.storage || "Ready" },
       ],
       statusValueNodes,

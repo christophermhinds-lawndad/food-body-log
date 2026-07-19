@@ -95,6 +95,7 @@ export async function collectInstallStatus(options = {}) {
     storage: "Ready",
     installMode: getInstallModeStatus(options.environment),
     offlineCache: await getCacheReadinessStatus(options),
+    cacheName: options.cacheName || CURRENT_CACHE_NAME,
   };
   const writeResult = storage.writeSetupStatus
     ? await storage.writeSetupStatus(statusRecord)
@@ -104,7 +105,9 @@ export async function collectInstallStatus(options = {}) {
     : { available: false, value: null };
   const storedValue = readResult.available && readResult.value ? readResult.value : writeResult.value;
   const storageReady = writeResult.available && readResult.available && storedValue?.key === "setup-status";
-  const offlineCache = storedValue?.offlineCache || statusRecord.offlineCache;
+  const offlineCache = storedValue?.cacheName === statusRecord.cacheName
+    ? storedValue?.offlineCache || statusRecord.offlineCache
+    : "Not ready";
 
   return {
     rows: [

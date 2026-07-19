@@ -25,6 +25,13 @@ test("settings copy includes required local-only, update, storage, and cache sta
   }
 });
 
+test("settings bootstrap only replays offline Ready for the current shell cache", () => {
+  assert.match(appSource, /CURRENT_CACHE_NAME/);
+  assert.match(appSource, /stored\.value\.cacheName === CURRENT_CACHE_NAME/);
+  assert.match(appSource, /const offlineCache = stored\.value\.cacheName === CURRENT_CACHE_NAME[\s\S]*\? stored\.value\.offlineCache \|\| "Not ready"[\s\S]*: "Not ready";/);
+  assert.match(installStatusSource, /cacheName: options\.cacheName \|\| CURRENT_CACHE_NAME/);
+});
+
 test("settings backup copy exposes export import warnings and confirmation language", () => {
   const requiredSnippets = [
     "Data backup",

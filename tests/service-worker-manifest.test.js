@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { CURRENT_CACHE_NAME, EXPECTED_SHELL_ASSETS, getCacheReadinessStatus } from "../public/scripts/install-status.js";
+import { CURRENT_CACHE_NAME, EXPECTED_SHELL_ASSETS, collectInstallStatus, getCacheReadinessStatus } from "../public/scripts/install-status.js";
 
 const swSource = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
 const phaseSixUatPath = new URL("../.planning/phases/06-data-safety-and-experience-hardening/06-UAT.md", import.meta.url);
@@ -93,6 +93,32 @@ test("cache readiness returns neutral status when service worker readiness never
     await getCacheReadinessStatus({ caches: readyCaches, navigator: navigatorLike, readinessTimeoutMs: 1 }),
     "Not ready",
   );
+});
+
+test("collected install status records the cache name checked for offline readiness", async () => {
+  const writes = [];
+  const storage = {
+    async writeSetupStatus(value) {
+      writes.push(structuredClone(value));
+      return { available: true, value: { key: "setup-status", ...value } };
+    },
+    async readSetupStatus() {
+      return { available: true, value: { key: "setup-status", ...writes.at(-1) } };
+    },
+  };
+  const scope = "https://example.test/food-body-log/";
+  const caches = createFakeCaches(scope, requiredShellAssets);
+  const navigatorLike = { serviceWorker: { ready: Promise.resolve({ scope }) } };
+
+  const status = await collectInstallStatus({
+    storage,
+    caches,
+    navigator: navigatorLike,
+    environment: {},
+  });
+
+  assert.equal(writes[0].cacheName, CURRENT_CACHE_NAME);
+  assert.equal(status.rows.find((row) => row.id === "offlineCache").value, "Ready");
 });
 
 test("service worker refreshes cached same-origin shell responses during online fetches", () => {
