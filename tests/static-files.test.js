@@ -24,6 +24,7 @@ const requiredPublishFiles = [
   "scripts/journal-model.js",
   "scripts/journal-tracking.js",
   "scripts/history-reports.js",
+  "scripts/data-portability.js",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/apple-touch-icon.png",
