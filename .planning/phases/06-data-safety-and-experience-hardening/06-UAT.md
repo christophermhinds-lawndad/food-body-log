@@ -17,33 +17,35 @@ Use this checklist during `$gsd-verify-work` to validate the final Phase 6 backu
 
 ## Local Browser Checks
 
+Browser import/export checks were marked verified by user confirmation on 2026-07-19.
+
 ### Export Download
 
 - Setup: open the app from a local static server or hosted static URL using a disposable test origin, then save at least one meal, weight, or reflection entry.
 - Steps: open Settings and activate `Export backup`.
 - Expected: the browser offers or creates a Food Body Log JSON backup file; Settings shows `Backup exported. Keep the file somewhere you can find it later.` Saved local data remains available in the app.
-- Result status: pending manual verification.
+- Result status: verified by user on 2026-07-19.
 
 ### Valid Import Merge
 
 - Setup: keep a known exported Food Body Log JSON backup from the same test origin or a disposable fixture. Export current local data first if it needs to be preserved.
 - Steps: open Settings, choose the valid JSON backup with dates that do not overlap local data, select `Import backup`, then reopen Today, Plan, Journal, History, and Reports.
 - Expected: validation shows `Backup looks ready to import. Non-overlapping dates will be added to local data.` Existing local dates remain saved, and imported records appear in the relevant tabs.
-- Result status: pending manual verification.
+- Result status: verified by user on 2026-07-19.
 
 ### Valid Import Overlap Confirmation
 
 - Setup: keep a known exported Food Body Log JSON backup whose dates overlap at least one local date on the test origin. Export current local data first if it needs to be preserved.
 - Steps: open Settings and choose the valid JSON backup.
 - Expected: Settings shows `Backup has dates that overlap local data. Check the overwrite box before importing.`, lists the number of overlapping days, shows the overlap checkbox, and keeps `Import backup` unavailable until the checkbox is checked. After checking the box and importing, overlapping dates are replaced by the backup while non-overlapping local dates stay saved.
-- Result status: pending manual verification.
+- Result status: verified by user on 2026-07-19.
 
 ### Invalid Import No-Write
 
 - Setup: create a malformed JSON file or edit a backup so it has an unsupported app, version, or missing required local data section.
 - Steps: open Settings, choose the invalid file, and inspect the import status.
 - Expected: Settings shows one of the calm invalid or unsupported backup messages plus `Nothing was imported, and the local data already on this device was not changed.` The replace action stays unavailable, and existing app data remains unchanged after reopening tabs.
-- Result status: pending manual verification.
+- Result status: verified by user on 2026-07-19.
 
 ### Settings Storage Warning
 
