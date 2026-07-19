@@ -381,7 +381,7 @@
             </div>
             <div class="status-row">
               <dt>Storage caveat</dt>
-              <dd data-status-value="storageCaveat">Browser storage can be cleared by deleting the app or website data. Export/import arrives in a later phase.</dd>
+              <dd data-status-value="storageCaveat">Deleting the Home Screen app, clearing website data, or changing browser storage can remove local app data from this device. Export a backup when you want a copy outside browser storage.</dd>
             </div>
             <div class="status-row">
               <dt>Updates</dt>
@@ -390,6 +390,49 @@
           </dl>
 
           <p id="settings-message" class="status-message">Open this app while online once more, then check again.</p>
+
+          <section
+            class="backup-section"
+            aria-labelledby="data-backup-title"
+            data-export-preparing-copy="Preparing backup..."
+            data-export-error-copy="Backup could not be exported. Reopen the app and try again. Data already saved on this device stays local."
+            data-file-selected-copy="Backup selected:"
+            data-import-checking-copy="Checking backup..."
+            data-import-ready-copy="Backup looks ready to import. Review the confirmation before replacing local data."
+            data-import-ready-action-copy="Replace local data"
+            data-import-confirm-title="Replace local data?"
+            data-import-confirm-body="This will replace the local data currently saved on this device with the selected backup. Export a backup first if you want a copy of what is here now."
+            data-import-success-copy="Backup imported. Reopen each tab to see restored local data."
+            data-import-invalid-copy="Backup could not be read. Choose a Food Body Log JSON backup exported from this app."
+            data-import-unsupported-copy="This backup format is not supported by this version of Food Body Log."
+            data-import-missing-store-copy="This backup is missing required local data sections, so nothing was imported."
+            data-import-oversized-copy="This file is larger than this version can import. Choose a smaller Food Body Log backup."
+            data-import-no-write-copy="Nothing was imported, and the local data already on this device was not changed."
+          >
+            <div>
+              <h2 id="data-backup-title">Data backup</h2>
+              <p class="backup-intro">Backups are JSON files you control. They include saved meals, weight entries, reflections, breakthroughs, and app settings from this device.</p>
+              <p class="backup-warning">Deleting the Home Screen app, clearing website data, or changing browser storage can remove local app data from this device. Export a backup when you want a copy outside browser storage.</p>
+            </div>
+
+            <div class="backup-controls">
+              <section class="backup-export-control" aria-labelledby="export-backup-title">
+                <h3 id="export-backup-title">Export backup</h3>
+                <button id="export-backup" class="primary-action compact-action" type="button">Export backup</button>
+                <p id="export-backup-status" class="status-message backup-status" aria-live="polite">Backup exported. Keep the file somewhere you can find it later.</p>
+              </section>
+
+              <section class="backup-file-control" aria-labelledby="import-backup-title">
+                <h3 id="import-backup-title">Import backup</h3>
+                <p class="note">Import replaces local data on this device after confirmation. Export first if you want to keep a copy of the current local data.</p>
+                <label class="field-label" for="backup-file-input">Choose backup file</label>
+                <input id="backup-file-input" class="text-field" type="file" accept=".json,application/json">
+                <p id="backup-selected-file" class="status-message backup-selected-file" aria-live="polite">No backup selected</p>
+                <button id="replace-local-data" class="secondary-action" type="button" disabled>Choose a backup first</button>
+                <p id="import-backup-status" class="status-message backup-status" aria-live="polite">Choose a Food Body Log JSON backup when you want to restore saved local data.</p>
+              </section>
+            </div>
+          </section>
         </section>
       </main>
 

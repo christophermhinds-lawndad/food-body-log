@@ -29,7 +29,7 @@ export const SETTINGS_COPY = Object.freeze({
   cacheChecking: "Checking offline app shell...",
   cacheNotReady: "Open this app while online once more, then check again.",
   updateNote: "Updates may require revisiting the app URL after new static files are published.",
-  storageCaveat: "Browser storage can be cleared by deleting the app or website data. Export/import arrives in a later phase.",
+  storageCaveat: "Deleting the Home Screen app, clearing website data, or changing browser storage can remove local app data from this device. Export a backup when you want a copy outside browser storage.",
 });
 
 export const CHECKING_STATUS_ROWS = Object.freeze([
