@@ -13,7 +13,7 @@ test("settings copy includes required local-only, update, storage, and cache sta
     "Checking offline app shell...",
     "Open this app while online once more, then check again.",
     "Updates may require revisiting the app URL after new static files are published.",
-    "Browser storage can be cleared by deleting the app or website data. Export/import arrives in a later phase.",
+    "Deleting the Home Screen app, clearing website data, or changing browser storage can remove local app data from this device. Export a backup when you want a copy outside browser storage.",
   ];
 
   for (const snippet of requiredSnippets) {
@@ -23,6 +23,57 @@ test("settings copy includes required local-only, update, storage, and cache sta
       `missing copy: ${snippet}`,
     );
   }
+});
+
+test("settings backup copy exposes export import warnings and confirmation language", () => {
+  const requiredSnippets = [
+    "Data backup",
+    "Backups are JSON files you control. They include saved meals, weight entries, reflections, breakthroughs, and app settings from this device.",
+    "Export backup",
+    "Preparing backup...",
+    "Backup exported. Keep the file somewhere you can find it later.",
+    "Backup could not be exported. Reopen the app and try again. Data already saved on this device stays local.",
+    "Import backup",
+    "Choose backup file",
+    "Import replaces local data on this device after confirmation. Export first if you want to keep a copy of the current local data.",
+    "No backup selected",
+    "Backup selected:",
+    "Checking backup...",
+    "Backup looks ready to import. Review the confirmation before replacing local data.",
+    "Choose a backup first",
+    "Replace local data?",
+    "This will replace the local data currently saved on this device with the selected backup. Export a backup first if you want a copy of what is here now.",
+    "Replace local data",
+    "Backup imported. Reopen each tab to see restored local data.",
+    "Backup could not be read. Choose a Food Body Log JSON backup exported from this app.",
+    "This backup format is not supported by this version of Food Body Log.",
+    "This backup is missing required local data sections, so nothing was imported.",
+    "This file is larger than this version can import. Choose a smaller Food Body Log backup.",
+    "Nothing was imported, and the local data already on this device was not changed.",
+  ];
+
+  for (const snippet of requiredSnippets) {
+    assert.match(
+      `${html}\n${appSource}\n${installStatusSource}`,
+      new RegExp(escapeRegExp(snippet)),
+      `missing backup copy: ${snippet}`,
+    );
+  }
+});
+
+test("settings markup exposes native backup controls and polite status regions", () => {
+  assert.match(html, /<section[^>]+class="backup-section"[^>]+aria-labelledby="data-backup-title"/);
+  assert.match(html, /<h2[^>]+id="data-backup-title"[^>]*>Data backup<\/h2>/);
+  assert.match(html, /<p[^>]+class="backup-warning"[^>]*>/);
+  assert.match(html, /<button[^>]+id="export-backup"[^>]+class="primary-action compact-action"[^>]+type="button"[^>]*>Export backup<\/button>/);
+  assert.match(html, /id="export-backup-status" class="status-message backup-status" aria-live="polite"/);
+  assert.match(html, /<section[^>]+class="backup-file-control"[^>]+aria-labelledby="import-backup-title"/);
+  assert.match(html, /<h3[^>]+id="import-backup-title"[^>]*>Import backup<\/h3>/);
+  assert.match(html, /<label[^>]+class="field-label"[^>]+for="backup-file-input"[^>]*>Choose backup file<\/label>/);
+  assert.match(html, /<input[^>]+id="backup-file-input"[^>]+type="file"[^>]+accept="\.json,application\/json"/);
+  assert.match(html, /id="backup-selected-file" class="status-message backup-selected-file" aria-live="polite"/);
+  assert.match(html, /id="import-backup-status" class="status-message backup-status" aria-live="polite"/);
+  assert.match(html, /<button[^>]+id="replace-local-data"[^>]+class="secondary-action"[^>]+type="button"[^>]+disabled[^>]*>Choose a backup first<\/button>/);
 });
 
 test("settings markup exposes separate install, offline, storage, privacy, caveat, and update rows", () => {

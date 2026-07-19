@@ -29,7 +29,13 @@ test("settings markup includes install status interaction and local-only copy", 
   assert.match(html, /Your data stays on this device/);
   assert.match(html, /not synced to an account/);
   assert.match(html, /Updates may require revisiting the app URL/);
-  assert.match(html, /Browser storage can be cleared/);
+  assert.match(html, /Deleting the Home Screen app, clearing website data, or changing browser storage can remove local app data/);
+  assert.match(html, />Data backup</);
+  assert.match(html, />Export backup</);
+  assert.match(html, />Import backup</);
+  assert.match(html, />Choose backup file</);
+  assert.match(html, /accept="\.json,application\/json"/);
+  assert.match(html, /aria-live="polite"/);
 });
 
 test("today and plan shell expose the Phase 2 tracer surfaces", () => {
@@ -177,6 +183,27 @@ test("plan suggestion styling is compact, touch-friendly, and wrapping-safe", ()
   assert.match(css, /\.plan-suggestion-option\s*\{[\s\S]*min-height: 44px;[\s\S]*padding: 8px;[\s\S]*border-radius: 8px;[\s\S]*font-size: 16px;[\s\S]*overflow-wrap: anywhere;[\s\S]*\}/);
   assert.match(css, /\.plan-suggestion-option:focus-visible/);
   assert.match(css, /\.plan-suggestion-option:hover\s*\{[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\);[\s\S]*\}/);
+});
+
+test("settings backup styling is mobile safe and wrapping aware", () => {
+  for (const selector of [
+    ".backup-section",
+    ".backup-warning",
+    ".backup-controls",
+    ".backup-file-control",
+    ".backup-status",
+    ".backup-selected-file",
+  ]) {
+    assert.match(css, new RegExp(escapeRegExp(selector)), `missing ${selector} styles`);
+  }
+
+  assert.match(css, /\.backup-section[\s\S]*display: grid;[\s\S]*gap: 24px;[\s\S]*min-width: 0;/);
+  assert.match(css, /\.backup-warning[\s\S]*border-radius: 8px;[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(css, /\.backup-controls[\s\S]*grid-template-columns: minmax\(0, 1fr\);[\s\S]*gap: 16px;/);
+  assert.match(css, /\.backup-file-control[\s\S]*min-width: 0;[\s\S]*border-radius: 8px;/);
+  assert.match(css, /\.backup-status[\s\S]*overflow-wrap: anywhere;/);
+  assert.match(css, /settings backup overflow backstop/);
+  assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.backup-section,[\s\S]*\.backup-warning,[\s\S]*\.backup-controls,[\s\S]*\.backup-file-control,[\s\S]*\.backup-status,[\s\S]*\.backup-selected-file[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
 });
 
 function escapeRegExp(value) {
