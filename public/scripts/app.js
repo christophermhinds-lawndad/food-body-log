@@ -9,6 +9,7 @@ import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
 import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=2";
 import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough } from "./journal-tracking.js?v=2";
 import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=1";
+import { createDownloadSpec, exportLocalData, parseBackupText, replaceLocalDataFromBackup } from "./data-portability.js?v=1";
 
 const appPaths = createAppPaths();
 
@@ -63,6 +64,12 @@ const historySaveButton = document.querySelector("[data-history-save]");
 const historyDayTemplate = document.querySelector("[data-history-day-template]");
 const historyMealTemplate = document.querySelector("[data-history-meal-template]");
 const historyAnswerTemplate = document.querySelector("[data-history-answer-template]");
+const exportBackupButton = document.querySelector("#export-backup");
+const exportBackupStatus = document.querySelector("#export-backup-status");
+const backupFileInput = document.querySelector("#backup-file-input");
+const backupSelectedFile = document.querySelector("#backup-selected-file");
+const replaceBackupButton = document.querySelector("#replace-local-data");
+const importBackupStatus = document.querySelector("#import-backup-status");
 const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded. You can keep typing.";
 const JOURNAL_LOAD_MESSAGE = "Loading evening reflection...";
 const JOURNAL_UNAVAILABLE_MESSAGE = "Evening reflection could not be loaded. Reopen the app and try again.";
@@ -70,6 +77,26 @@ const JOURNAL_SAVE_ERROR_MESSAGE = "Reflection could not be saved. Try again; da
 const NO_EXTRA_PROMPTS_MESSAGE = "Nothing extra to reflect on from today's meal answers. You can still write anything that feels useful.";
 const MISSING_MEAL_DATA_MESSAGE = "Not all meals are logged yet. That is okay; only logged non-skipped No answers add extra prompts.";
 const DROP_SUCCESS_MESSAGE = "Breakthrough removed. The original answer stayed saved.";
+const MAX_BACKUP_FILE_BYTES = 2_000_000;
+const BACKUP_UI_COPY = Object.freeze({
+  exportPreparing: "Preparing backup...",
+  exportSuccess: "Backup exported. Keep the file somewhere you can find it later.",
+  exportError: "Backup could not be exported. Reopen the app and try again. Data already saved on this device stays local.",
+  noFile: "No backup selected",
+  fileSelectedPrefix: "Backup selected:",
+  checking: "Checking backup...",
+  ready: "Backup looks ready to import. Review the confirmation before replacing local data.",
+  chooseFirst: "Choose a backup first",
+  confirmTitle: "Replace local data?",
+  confirmBody: "This will replace the local data currently saved on this device with the selected backup. Export a backup first if you want a copy of what is here now.",
+  replaceAction: "Replace local data",
+  imported: "Backup imported. Reopen each tab to see restored local data.",
+  invalid: "Backup could not be read. Choose a Food Body Log JSON backup exported from this app.",
+  unsupported: "This backup format is not supported by this version of Food Body Log.",
+  missingStore: "This backup is missing required local data sections, so nothing was imported.",
+  oversized: "This file is larger than this version can import. Choose a smaller Food Body Log backup.",
+  noWrite: "Nothing was imported, and the local data already on this device was not changed.",
+});
 let todayDayID = getTodayDayID();
 let planDayID = getTomorrowDayID();
 let journalDayID = todayDayID;
@@ -78,6 +105,8 @@ let journalLoadRequestID = 0;
 let reportsLoadRequestID = 0;
 let historyLoadRequestID = 0;
 let historyDayLoadRequestID = 0;
+let backupSelectionRequestID = 0;
+let readyBackupPayload = null;
 let currentJournalState = null;
 let currentHistoryDayState = null;
 let pendingWeightConfirmation = null;
@@ -98,6 +127,18 @@ document.querySelectorAll("[data-tab]").forEach((button) => {
 
 document.querySelector("#check-install-status")?.addEventListener("click", () => {
   checkInstallStatus();
+});
+
+exportBackupButton?.addEventListener("click", () => {
+  exportBackup();
+});
+
+backupFileInput?.addEventListener("change", () => {
+  validateSelectedBackup();
+});
+
+replaceBackupButton?.addEventListener("click", () => {
+  replaceFromSelectedBackup();
 });
 
 weightForm?.addEventListener("submit", (event) => {
@@ -229,6 +270,7 @@ historyDetail?.addEventListener("click", (event) => {
 
 registerServiceWorker();
 readStoredStatus();
+resetBackupImportState();
 loadTodayView();
 loadPlanView();
 
@@ -307,6 +349,157 @@ async function checkInstallStatus() {
 
   renderStatusRows(status.rows, statusValueNodes);
   setText(settingsMessage, status.message);
+}
+
+async function exportBackup() {
+  setText(exportBackupStatus, BACKUP_UI_COPY.exportPreparing);
+  if (exportBackupButton) {
+    exportBackupButton.disabled = true;
+  }
+
+  try {
+    const exported = await exportLocalData();
+    const downloadSpec = exported.status === "Ready" ? createDownloadSpec(exported.payload, exported.fileName) : exported;
+
+    if (downloadSpec.status !== "Ready") {
+      setText(exportBackupStatus, BACKUP_UI_COPY.exportError);
+      return;
+    }
+
+    triggerBackupDownload(downloadSpec);
+    setText(exportBackupStatus, BACKUP_UI_COPY.exportSuccess);
+  } catch {
+    setText(exportBackupStatus, BACKUP_UI_COPY.exportError);
+  } finally {
+    if (exportBackupButton) {
+      exportBackupButton.disabled = false;
+    }
+  }
+}
+
+async function validateSelectedBackup() {
+  backupSelectionRequestID += 1;
+  const requestID = backupSelectionRequestID;
+  const file = backupFileInput?.files?.[0] || null;
+  readyBackupPayload = null;
+  updateReplaceBackupAction();
+
+  if (!file) {
+    setText(backupSelectedFile, BACKUP_UI_COPY.noFile);
+    setText(importBackupStatus, "");
+    return;
+  }
+
+  setText(backupSelectedFile, `${BACKUP_UI_COPY.fileSelectedPrefix} ${file.name || "backup.json"}`);
+
+  if (Number.isFinite(file.size) && file.size > MAX_BACKUP_FILE_BYTES) {
+    setText(importBackupStatus, backupImportStatusText({ error: { code: "file-too-large" } }));
+    return;
+  }
+
+  setText(importBackupStatus, BACKUP_UI_COPY.checking);
+
+  try {
+    const text = await file.text();
+
+    if (requestID !== backupSelectionRequestID) {
+      return;
+    }
+
+    const parsed = parseBackupText(text);
+
+    if (requestID !== backupSelectionRequestID) {
+      return;
+    }
+
+    if (parsed.status !== "Ready") {
+      setText(importBackupStatus, backupImportStatusText(parsed));
+      updateReplaceBackupAction();
+      return;
+    }
+
+    readyBackupPayload = parsed.payload;
+    setText(importBackupStatus, BACKUP_UI_COPY.ready);
+    updateReplaceBackupAction();
+  } catch {
+    if (requestID !== backupSelectionRequestID) {
+      return;
+    }
+
+    setText(importBackupStatus, `${BACKUP_UI_COPY.invalid} ${BACKUP_UI_COPY.noWrite}`);
+    updateReplaceBackupAction();
+  }
+}
+
+async function replaceFromSelectedBackup() {
+  if (!readyBackupPayload) {
+    setText(importBackupStatus, BACKUP_UI_COPY.chooseFirst);
+    updateReplaceBackupAction();
+    return;
+  }
+
+  if (!window.confirm(`${BACKUP_UI_COPY.confirmTitle}\n\n${BACKUP_UI_COPY.confirmBody}`)) {
+    setText(importBackupStatus, BACKUP_UI_COPY.ready);
+    return;
+  }
+
+  setText(importBackupStatus, "Replacing local data...");
+  replaceBackupButton.disabled = true;
+
+  const result = await replaceLocalDataFromBackup(readyBackupPayload);
+
+  if (result.status !== "Ready") {
+    setText(importBackupStatus, backupImportStatusText(result));
+    updateReplaceBackupAction();
+    return;
+  }
+
+  readyBackupPayload = null;
+  if (backupFileInput) {
+    backupFileInput.value = "";
+  }
+  setText(backupSelectedFile, BACKUP_UI_COPY.noFile);
+  setText(importBackupStatus, BACKUP_UI_COPY.imported);
+  updateReplaceBackupAction();
+}
+
+function triggerBackupDownload(downloadSpec) {
+  const blob = new Blob([downloadSpec.text], { type: downloadSpec.mimeType || "application/json" });
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = downloadSpec.fileName || "food-body-log-backup.json";
+  link.hidden = true;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+function resetBackupImportState() {
+  readyBackupPayload = null;
+  setText(backupSelectedFile, BACKUP_UI_COPY.noFile);
+  updateReplaceBackupAction();
+}
+
+function updateReplaceBackupAction() {
+  if (!replaceBackupButton) {
+    return;
+  }
+
+  replaceBackupButton.disabled = !readyBackupPayload;
+  setText(replaceBackupButton, readyBackupPayload ? BACKUP_UI_COPY.replaceAction : BACKUP_UI_COPY.chooseFirst);
+}
+
+function backupImportStatusText(result) {
+  const code = result?.error?.code || "";
+  const copy = {
+    "unsupported-backup": BACKUP_UI_COPY.unsupported,
+    "missing-store": BACKUP_UI_COPY.missingStore,
+    "file-too-large": BACKUP_UI_COPY.oversized,
+  }[code] || BACKUP_UI_COPY.invalid;
+
+  return `${copy} ${BACKUP_UI_COPY.noWrite}`;
 }
 
 async function loadTodayView() {

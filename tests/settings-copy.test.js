@@ -153,7 +153,7 @@ test("backup import controller validates before replace and guards stale file se
 });
 
 test("backup replace action is confirmation gated and invalid paths do not call writer", () => {
-  assert.match(appSource, /window\.confirm\(\`${BACKUP_UI_COPY\.confirmTitle}\\n\\n\${BACKUP_UI_COPY\.confirmBody}`\)/);
+  assert.match(appSource, /window\.confirm\(`\$\{BACKUP_UI_COPY\.confirmTitle\}\\n\\n\$\{BACKUP_UI_COPY\.confirmBody\}`\)/);
   assert.match(appSource, /replaceLocalDataFromBackup\(readyBackupPayload\)/);
   assert.match(appSource, /Nothing was imported, and the local data already on this device was not changed\./);
 
