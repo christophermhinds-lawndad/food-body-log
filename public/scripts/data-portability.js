@@ -202,7 +202,7 @@ export async function importSelectedBackup(file) {
   }
 }
 
-export function createDownloadSpec(payload, fileName = backupFileName(isoString(new Date()))) {
+export function createDownloadSpec(payload, fileName = "") {
   const validation = validateBackupPayload(payload);
 
   if (validation.status !== "Ready") {
