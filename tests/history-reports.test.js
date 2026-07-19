@@ -504,6 +504,20 @@ test("weight report summary emits comparison narratives and threshold notices", 
   assert.match(progressingState.weightSummary.lines[1], /lower by 5 pounds, 2\.6% of total mass, compared to the trailing 30 day average/);
   assert.match(progressingState.weightSummary.lines[1], /lower by 12 pounds, 5\.9% of total mass, compared to the 90 day average\./);
 
+  const flexibleProgressing = await loadModules("reports-flexible-progressing");
+  seedWeightRange(flexibleProgressing.db, -89, -30, 210);
+  seedWeightRange(flexibleProgressing.db, -29, -14, 204);
+  seedWeightRange(flexibleProgressing.db, -13, -7, 202.4);
+  seedWeightRange(flexibleProgressing.db, -6, 0, 200);
+
+  const flexibleProgressingState = await flexibleProgressing.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.deepEqual(flexibleProgressingState.weightSummary.comparisons.map((comparison) => [comparison.id, comparison.percent]), [
+    ["prior7", -1.2],
+    ["trailing30", -1.3],
+    ["trailing90", -3.7],
+  ]);
+  assert.equal(flexibleProgressingState.weightSummary.notice.kind, "Progressing");
+
   const considerMore = await loadModules("reports-consider-more");
   seedWeightRange(considerMore.db, -89, -30, 214);
   seedWeightRange(considerMore.db, -29, -14, 214);
@@ -514,6 +528,20 @@ test("weight report summary emits comparison narratives and threshold notices", 
   assert.equal(considerMoreState.weightSummary.notice.kind, "ConsiderEatingMore");
   assert.equal(considerMoreState.weightSummary.notice.text, "Weight notice: Saved entries are lower outside the recent comparison range. These numbers are for observation only; no action is required here.");
 
+  const fastLossPriority = await loadModules("reports-fast-loss-priority");
+  seedWeightRange(fastLossPriority.db, -89, -30, 230);
+  seedWeightRange(fastLossPriority.db, -29, -14, 195);
+  seedWeightRange(fastLossPriority.db, -13, -7, 191);
+  seedWeightRange(fastLossPriority.db, -6, 0, 190);
+
+  const fastLossPriorityState = await fastLossPriority.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.deepEqual(fastLossPriorityState.weightSummary.comparisons.map((comparison) => [comparison.id, comparison.percent]), [
+    ["prior7", -0.5],
+    ["trailing30", -1.5],
+    ["trailing90", -12.7],
+  ]);
+  assert.equal(fastLossPriorityState.weightSummary.notice.kind, "ConsiderEatingMore");
+
   const reflect = await loadModules("reports-reflect");
   seedWeightRange(reflect.db, -89, -30, 200);
   seedWeightRange(reflect.db, -29, -14, 199);
@@ -523,6 +551,20 @@ test("weight report summary emits comparison narratives and threshold notices", 
   const reflectState = await reflect.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(reflectState.weightSummary.notice.kind, "Reflect");
   assert.equal(reflectState.weightSummary.notice.text, "Weight notice: Saved entries are higher across some periods. These numbers are for observation only; no action is required here.");
+
+  const moderateGain = await loadModules("reports-moderate-gain");
+  seedWeightRange(moderateGain.db, -89, -30, 203);
+  seedWeightRange(moderateGain.db, -29, -14, 196);
+  seedWeightRange(moderateGain.db, -13, -7, 201);
+  seedWeightRange(moderateGain.db, -6, 0, 203);
+
+  const moderateGainState = await moderateGain.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.deepEqual(moderateGainState.weightSummary.comparisons.map((comparison) => [comparison.id, comparison.percent]), [
+    ["prior7", 1],
+    ["trailing30", 2.1],
+    ["trailing90", 0.7],
+  ]);
+  assert.equal(moderateGainState.weightSummary.notice.kind, "Reflect");
 
   const stable = await loadModules("reports-stable");
   seedWeightRange(stable.db, -89, -30, 190);

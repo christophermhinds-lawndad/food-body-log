@@ -23,9 +23,27 @@ const WEIGHT_WINDOWS = Object.freeze([7, 30, 90]);
 const REPORT_MEAL_WINDOW_DAYS = 7;
 const LARGE_WEIGHT_CHANGE_THRESHOLD = 5;
 const WEIGHT_STATUS_THRESHOLDS = Object.freeze({
-  prior7: { sustainableMin: 0.5, sustainableMax: 0.75 },
-  trailing30: { sustainableMin: 2, sustainableMax: 3 },
-  trailing90: { sustainableMin: 5, sustainableMax: 7 },
+  prior7: {
+    sustainableMin: 0.25,
+    sustainableMax: 1,
+    fastLoss: 1.25,
+    meaningfulGain: 0.75,
+    strongGain: 1.5,
+  },
+  trailing30: {
+    sustainableMin: 1,
+    sustainableMax: 3.5,
+    fastLoss: 4,
+    meaningfulGain: 2,
+    strongGain: 3,
+  },
+  trailing90: {
+    sustainableMin: 3,
+    sustainableMax: 7,
+    fastLoss: 8,
+    meaningfulGain: 4,
+    strongGain: 6,
+  },
 });
 const UNAVAILABLE = Object.freeze({
   available: false,
@@ -574,25 +592,30 @@ function createWeightComparison(id, currentAverage, comparisonAverage) {
 }
 
 function weightNoticeForComparisons(comparisons) {
-  const evaluable = comparisons.filter((comparison) => Number.isFinite(comparison.percent));
+  const evaluable = comparisons.filter((comparison) =>
+    Number.isFinite(comparison.percent) && WEIGHT_STATUS_THRESHOLDS[comparison.id]);
 
-  if (evaluable.some((comparison) => comparison.percent < -WEIGHT_STATUS_THRESHOLDS[comparison.id].sustainableMax)) {
+  if (evaluable.some((comparison) => comparison.percent < -WEIGHT_STATUS_THRESHOLDS[comparison.id].fastLoss)) {
     return createWeightNotice("ConsiderEatingMore", REPORTS_COPY.weightConsiderMore);
   }
 
-  if (evaluable.some((comparison) => comparison.percent >= 2)) {
+  const meaningfulGainCount = evaluable.filter((comparison) =>
+    comparison.percent >= WEIGHT_STATUS_THRESHOLDS[comparison.id].meaningfulGain).length;
+  const hasStrongGain = evaluable.some((comparison) =>
+    comparison.percent >= WEIGHT_STATUS_THRESHOLDS[comparison.id].strongGain);
+
+  if (hasStrongGain || meaningfulGainCount >= 2) {
     return createWeightNotice("Reflect", REPORTS_COPY.weightReflect);
   }
 
-  if (["prior7", "trailing30", "trailing90"].every((id) => {
-    const comparison = evaluable.find((candidate) => candidate.id === id);
-    const threshold = WEIGHT_STATUS_THRESHOLDS[id];
-    const lossPercent = comparison ? Math.abs(Math.min(comparison.percent, 0)) : null;
+  const sustainableLossCount = evaluable.filter((comparison) => {
+    const threshold = WEIGHT_STATUS_THRESHOLDS[comparison.id];
+    const lossPercent = Math.abs(Math.min(comparison.percent, 0));
 
-    return lossPercent != null
-      && lossPercent >= threshold.sustainableMin
-      && lossPercent <= threshold.sustainableMax;
-  })) {
+    return lossPercent >= threshold.sustainableMin && lossPercent <= threshold.sustainableMax;
+  }).length;
+
+  if (sustainableLossCount >= 2) {
     return createWeightNotice("Progressing", REPORTS_COPY.weightProgressing);
   }
 

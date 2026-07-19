@@ -73,6 +73,13 @@ Use this checklist during `$gsd-verify-work` to validate the final Phase 6 backu
 - Expected: each visible date behaves as an accordion with that day's details inside the selected row. History renders 5 days per page, exposes no more than the most recent 15 days across 3 pages, and shows a notice that only the most recent 15 days are viewable in History.
 - Result status: pending manual verification.
 
+### Weight Notice Priority Logic
+
+- Setup: import or create weight entries that exercise fast decrease, meaningful increase, sustainable decrease, and neutral ranges across 7-vs-prior-7, 7-vs-30, and 7-vs-90 comparisons.
+- Steps: open Reports and inspect the top weight notice.
+- Expected: fast decrease shows the lower-outside-range notice before any other status; meaningful gain shows the higher-across-periods notice when any one comparison is strongly high or two comparisons are meaningfully high; sustainable decrease shows the lower-across-periods notice when at least two available comparisons are in the sustainable decrease range and no higher-priority notice applies; Stable appears only after those three status conditions are ruled out.
+- Result status: pending manual verification.
+
 ### Safety And Tone Pass
 
 - Setup: use sparse data, partial days, skipped meals, invalid backup input, unsupported backup input, and read-only History days.
