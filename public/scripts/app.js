@@ -1,13 +1,13 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=4";
+import { CHECKING_STATUS_ROWS, collectInstallStatus } from "./install-status.js?v=5";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
-import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=3";
+import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=4";
 import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
-import { JOURNAL_CHIPS, BREAKTHROUGH_STATES } from "./journal-model.js?v=1";
-import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough } from "./journal-tracking.js?v=1";
+import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=2";
+import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough } from "./journal-tracking.js?v=2";
 
 const appPaths = createAppPaths();
 
@@ -35,6 +35,7 @@ const journalPromptList = document.querySelector("#journal-prompt-list");
 const journalDay = document.querySelector("#journal-day");
 const journalHelper = document.querySelector("#journal-helper");
 const journalMessage = document.querySelector("#journal-message");
+const outsidePlanControls = Array.from(document.querySelectorAll("[name='outside-plan']"));
 const breakthroughList = document.querySelector("#breakthrough-list");
 const breakthroughMessage = document.querySelector("#breakthrough-message");
 const journalPromptTemplate = document.querySelector("[data-journal-prompt-template]");
@@ -52,6 +53,7 @@ let planDayID = getTomorrowDayID();
 let journalDayID = todayDayID;
 let journalLoadRequestID = 0;
 let currentJournalState = null;
+let pendingWeightConfirmation = null;
 const planSuggestions = createPlanSuggestionController({
   document,
   getPlanSuggestions,
@@ -82,6 +84,12 @@ planForm?.addEventListener("submit", (event) => {
 journalForm?.addEventListener("submit", (event) => {
   event.preventDefault();
   saveJournalReflection();
+});
+
+outsidePlanControls.forEach((control) => {
+  control.addEventListener("change", () => {
+    updateJournalPromptsForOutsidePlanChoice();
+  });
 });
 
 document.querySelectorAll("[name='plan-day']").forEach((control) => {
@@ -367,7 +375,13 @@ async function saveCurrentJournalDraft() {
 }
 
 function serializeJournalAnswers() {
-  return Object.fromEntries(Array.from(document.querySelectorAll("[data-journal-answer-card]"))
+  return {
+    [OUTSIDE_PLAN_PROMPT_ID]: {
+      text: selectedOutsidePlanValue(),
+      selectedChipIDs: [],
+      detail: "",
+    },
+    ...Object.fromEntries(Array.from(document.querySelectorAll("[data-journal-answer-card]"))
     .map((card) => {
       const selectedChipIDs = Array.from(card.querySelectorAll("[data-journal-chip][aria-pressed='true']"))
         .map((button) => button.dataset.journalChip);
@@ -377,7 +391,8 @@ function serializeJournalAnswers() {
         selectedChipIDs,
         detail: card.querySelector("[data-journal-detail-text]")?.value || "",
       }];
-    }));
+    })),
+  };
 }
 
 async function toggleAnswerBreakthrough(button) {
@@ -462,13 +477,24 @@ function showSourceDayMessage(button) {
 
 async function saveTodayWeight() {
   refreshCurrentDayIDs();
-  const result = await saveWeight(todayDayID, weightInput?.value || "");
+  const value = weightInput?.value || "";
+  const result = await saveWeight(todayDayID, value, {
+    confirmLargeChange: pendingWeightConfirmation?.dayID === todayDayID && pendingWeightConfirmation?.value === value,
+  });
 
   if (!isReadyResult(result)) {
+    if (result.status === "NeedsConfirmation") {
+      pendingWeightConfirmation = { dayID: todayDayID, value };
+      setText(weightMessage, "This is more than 5 pounds different from yesterday. Check for a typo, then tap Save weight again to confirm.");
+      return;
+    }
+
+    pendingWeightConfirmation = null;
     setText(weightMessage, result.status === "Invalid" ? "Enter a positive weight value before saving." : "Weight could not be saved. Try again.");
     return;
   }
 
+  pendingWeightConfirmation = null;
   renderTodayState(result);
   setText(weightMessage, "Weight saved for today.");
 }
@@ -561,9 +587,42 @@ function renderJournalState(state) {
   currentJournalState = state;
   journalDayID = state.day?.dayID || journalDayID;
   setText(journalDay, journalDayID);
+  setOutsidePlanChoice(state.outsidePlanAnswer?.text || "");
   renderJournalPrompts(state.prompts, state.answers);
   renderJournalHelper(state);
   renderBreakthroughs(state.breakthroughs);
+}
+
+function updateJournalPromptsForOutsidePlanChoice() {
+  if (!currentJournalState?.meals) {
+    return;
+  }
+
+  const draftByPrompt = serializeJournalAnswers();
+  const prompts = promptsForMeals(currentJournalState.meals, { outsidePlan: selectedOutsidePlanValue() === "yes" });
+  const answersByPrompt = new Map((currentJournalState.answers || []).map((answer) => [answer.promptID, answer]));
+  const draftAnswers = prompts.map((prompt) => ({
+    ...(answersByPrompt.get(prompt.id) || {}),
+    id: answersByPrompt.get(prompt.id)?.id || "",
+    promptID: prompt.id,
+    text: draftByPrompt[prompt.id]?.text || answersByPrompt.get(prompt.id)?.text || "",
+    selectedChips: mergeSelectedChipSnapshots(draftByPrompt[prompt.id]?.selectedChipIDs, answersByPrompt.get(prompt.id)?.selectedChips || []),
+    detail: draftByPrompt[prompt.id]?.detail || answersByPrompt.get(prompt.id)?.detail || "",
+    breakthroughState: answersByPrompt.get(prompt.id)?.breakthroughState || BREAKTHROUGH_STATES.none,
+  }));
+
+  currentJournalState = {
+    ...currentJournalState,
+    prompts,
+    answers: draftAnswers,
+    outsidePlanAnswer: {
+      ...(currentJournalState.outsidePlanAnswer || {}),
+      promptID: OUTSIDE_PLAN_PROMPT_ID,
+      text: selectedOutsidePlanValue(),
+    },
+  };
+  renderJournalPrompts(prompts, draftAnswers);
+  renderJournalHelper(currentJournalState);
 }
 
 function renderJournalPrompts(prompts, answers) {
@@ -582,6 +641,9 @@ function renderJournalPromptCard(prompt, answer = null) {
   const detailID = `journal-${prompt.id}-detail`;
   const textArea = card.querySelector("[data-journal-answer-text]");
   const label = card.querySelector("[data-journal-prompt-label]");
+  const contextList = card.querySelector("[data-journal-context-list]");
+  const contextHeading = card.querySelector("[data-journal-context-heading]");
+  const contextItems = card.querySelector("[data-journal-context-items]");
   const chipGroup = card.querySelector("[data-journal-chip-group]");
   const chipList = card.querySelector("[data-journal-chip-list]");
   const detailLabel = card.querySelector("[data-journal-detail-label]");
@@ -594,6 +656,7 @@ function renderJournalPromptCard(prompt, answer = null) {
   card.dataset.answerId = answer?.id || "";
   card.dataset.breakthroughState = breakthroughState;
   setText(label, prompt.text);
+  renderPromptContext(contextList, contextHeading, contextItems, prompt);
 
   if (label) {
     label.setAttribute("for", textID);
@@ -627,6 +690,45 @@ function renderJournalPromptCard(prompt, answer = null) {
   }
 
   return card;
+}
+
+function renderPromptContext(contextList, contextHeading, contextItems, prompt) {
+  if (!contextList || !prompt.contextItems?.length) {
+    return;
+  }
+
+  contextList.hidden = false;
+  setText(contextHeading, prompt.contextHeading || "");
+  replaceChildren(contextItems);
+
+  for (const item of prompt.contextItems) {
+    const node = document.createElement("li");
+    setText(node, item);
+    contextItems.append(node);
+  }
+}
+
+function selectedOutsidePlanValue() {
+  return outsidePlanControls.find((control) => control.checked)?.value || "";
+}
+
+function setOutsidePlanChoice(value) {
+  for (const control of outsidePlanControls) {
+    control.checked = control.value === value;
+  }
+}
+
+function mergeSelectedChipSnapshots(selectedChipIDs = [], existingChips = []) {
+  if (!selectedChipIDs?.length) {
+    return existingChips;
+  }
+
+  const chipByID = new Map(JOURNAL_CHIPS.map((chip) => [chip.id, chip]));
+
+  return selectedChipIDs
+    .map((chipID) => chipByID.get(chipID))
+    .filter(Boolean)
+    .map((chip) => ({ id: chip.id, label: chip.label }));
 }
 
 function renderJournalChips(container, selectedChips) {
@@ -758,7 +860,7 @@ function setPlanFormDisabled(disabled) {
 }
 
 function setJournalFormDisabled(disabled) {
-  journalForm?.querySelectorAll("textarea, button").forEach((control) => {
+  journalForm?.querySelectorAll("input, textarea, button").forEach((control) => {
     control.disabled = disabled;
   });
 }

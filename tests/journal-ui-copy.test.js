@@ -14,6 +14,12 @@ const journalRequiredCopy = [
   "Loading evening reflection...",
   "Evening reflection could not be loaded. Reopen the app and try again.",
   "Reflection saved.",
+  "Did I eat food outside of my plan, when I was not hungry?",
+  "What food?",
+  "What time of day?",
+  "Context Tiles",
+  "Meals marked as eaten past enough",
+  "Meals marked as eaten when not hungry",
   "How was I feeling around food today?",
   "What helped me listen to hunger or enough today?",
   "What would support me tomorrow?",
@@ -68,6 +74,8 @@ test("journal markup starts with usable reflection form and optional fields", ()
 
   assert.match(journalSurface, /<form[^>]+id="journal-form"[^>]+class="stack-form"/);
   assert.match(journalSurface, /id="journal-prompt-list"/);
+  assert.match(journalSurface, /name="outside-plan" value="yes"/);
+  assert.match(journalSurface, /name="outside-plan" value="no"/);
   assert.match(journalSurface, /id="breakthrough-list"/);
   assert.match(journalSurface, /id="journal-message"[^>]+aria-live="polite"/);
   assert.match(journalSurface, /id="breakthrough-message"[^>]+aria-live="polite"/);
@@ -78,8 +86,10 @@ test("journal markup starts with usable reflection form and optional fields", ()
 
 test("journal controller imports repository and wires load save breakthrough actions", () => {
   assert.match(appSource, /import \{ JOURNAL_CHIPS/);
-  assert.match(appSource, /from "\.\/journal-model\.js\?v=1"/);
+  assert.match(appSource, /from "\.\/journal-model\.js\?v=2"/);
   assert.match(appSource, /getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough/);
+  assert.match(appSource, /function updateJournalPromptsForOutsidePlanChoice\(\)/);
+  assert.match(appSource, /OUTSIDE_PLAN_PROMPT_ID/);
   assert.match(appSource, /if \(tabName === "journal"\) \{\n\s+loadJournalView\(\);/);
   assert.match(appSource, /async function loadJournalView\(\)/);
   assert.match(appSource, /async function saveJournalReflection\(\)/);
@@ -133,6 +143,8 @@ test("journal UI state and mobile backstop coverage is statically named", () => 
     "breakthrough-card",
     "breakthrough-answer",
     "journal-chip-list",
+    "journal-context-list",
+    "journal-gate",
     "journal-textarea",
     "overflow-wrap: anywhere",
     "@media (max-width: 430px)",

@@ -391,6 +391,51 @@ p {
   background: var(--surface);
 }
 
+.journal-gate {
+  margin-bottom: 0;
+}
+
+.journal-context-list {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-secondary);
+}
+
+.journal-context-list p,
+.journal-context-list ul {
+  margin: 0;
+}
+
+.journal-context-list p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.journal-context-list ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.journal-context-list li {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .journal-textarea {
   min-height: 96px;
   resize: vertical;

@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
     <link rel="stylesheet" href="./styles/app.css">
-    <script type="module" src="./scripts/app.js?v=4"></script>
+    <script type="module" src="./scripts/app.js?v=5"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -199,6 +199,11 @@
             </div>
             <p id="journal-helper" class="note">Nothing extra to reflect on from today's meal answers. You can still write anything that feels useful.</p>
             <form id="journal-form" class="stack-form">
+              <fieldset class="segmented-control journal-gate" data-outside-plan-group>
+                <legend>Did I eat food outside of my plan, when I was not hungry?</legend>
+                <label><input type="radio" name="outside-plan" value="yes"> Yes</label>
+                <label><input type="radio" name="outside-plan" value="no"> No</label>
+              </fieldset>
               <div id="journal-prompt-list" class="journal-prompt-list" aria-live="polite"></div>
               <button class="primary-action compact-action" type="submit">Save reflection</button>
               <p id="journal-message" class="status-message" aria-live="polite">Loading evening reflection...</p>
@@ -214,6 +219,10 @@
           <template data-journal-prompt-template>
             <article class="journal-prompt-card" data-journal-answer-card>
               <label class="field-label" data-journal-prompt-label></label>
+              <div class="journal-context-list" data-journal-context-list hidden>
+                <p data-journal-context-heading></p>
+                <ul data-journal-context-items></ul>
+              </div>
               <textarea class="text-field journal-textarea" data-journal-answer-text rows="3"></textarea>
               <fieldset class="journal-chip-group" data-journal-chip-group hidden>
                 <legend>Optional context</legend>

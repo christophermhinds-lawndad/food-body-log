@@ -1,9 +1,18 @@
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
 
+export const OUTSIDE_PLAN_PROMPT_ID = "outside-plan-check";
+
 export const BREAKTHROUGH_STATES = Object.freeze({
   none: "none",
   marked: "marked",
   dropped: "dropped",
+});
+
+export const OUTSIDE_PLAN_PROMPT = Object.freeze({
+  id: OUTSIDE_PLAN_PROMPT_ID,
+  text: "Did I eat food outside of my plan, when I was not hungry?",
+  supportsChips: false,
+  supportsDetail: false,
 });
 
 export const JOURNAL_PROMPTS = Object.freeze([
@@ -65,22 +74,36 @@ export const JOURNAL_CHIPS = Object.freeze([
 
 const BASELINE_PROMPTS = Object.freeze(JOURNAL_PROMPTS.slice(0, 3));
 const CHIP_BY_ID = new Map(JOURNAL_CHIPS.map((chip) => [chip.id, chip]));
+const SLOT_LABELS = Object.freeze({
+  breakfast: "Breakfast",
+  lunch: "Lunch",
+  dinner: "Dinner",
+  snack: "Optional Snack",
+});
 
 export function journalAnswerID(dayID, promptID) {
   const prompt = getPrompt(promptID);
   return `${String(dayID)}:journal:${prompt.id}`;
 }
 
-export function promptsForMeals(meals) {
+export function promptsForMeals(meals, options = {}) {
   const flags = promptFlagsForMeals(meals);
-  const prompts = [...BASELINE_PROMPTS];
+  const outsidePlan = options.outsidePlan === true;
+  const prompts = outsidePlan
+    ? [
+      getPrompt("outside-plan-food"),
+      getPrompt("outside-plan-time"),
+      getPrompt("outside-plan-context"),
+      ...BASELINE_PROMPTS.slice(1),
+    ]
+    : [...BASELINE_PROMPTS];
 
   if (flags.hungryNo) {
-    prompts.push(getPrompt("deeper-hungry"));
+    prompts.push(withContextItems(getPrompt("deeper-hungry"), "Meals marked as eaten when not hungry", flags.hungryNoMeals));
   }
 
   if (flags.enoughNo) {
-    prompts.push(getPrompt("deeper-enough"));
+    prompts.push(withContextItems(getPrompt("deeper-enough"), "Meals marked as eaten past enough", flags.enoughNoMeals));
   }
 
   if (flags.hungryNo || flags.enoughNo) {
@@ -130,11 +153,27 @@ export function createJournalAnswerRecord(dayID, prompt, input = {}, existing = 
 function promptFlagsForMeals(meals) {
   const loggedMeals = (Array.isArray(meals) ? meals : [])
     .filter((meal) => meal?.logState === MEAL_STATES.logged);
+  const hungryNoMeals = loggedMeals.filter((meal) => meal.ateWhenHungry === MEAL_ANSWERS.no).map(mealLabel);
+  const enoughNoMeals = loggedMeals.filter((meal) => meal.stoppedAtEnough === MEAL_ANSWERS.no).map(mealLabel);
 
   return {
-    hungryNo: loggedMeals.some((meal) => meal.ateWhenHungry === MEAL_ANSWERS.no),
-    enoughNo: loggedMeals.some((meal) => meal.stoppedAtEnough === MEAL_ANSWERS.no),
+    hungryNo: hungryNoMeals.length > 0,
+    enoughNo: enoughNoMeals.length > 0,
+    hungryNoMeals,
+    enoughNoMeals,
   };
+}
+
+function withContextItems(prompt, contextHeading, contextItems) {
+  return Object.freeze({
+    ...prompt,
+    contextHeading,
+    contextItems: Object.freeze([...contextItems]),
+  });
+}
+
+function mealLabel(meal) {
+  return SLOT_LABELS[meal?.slot] || String(meal?.slot || "Meal");
 }
 
 function normalizeSelectedChips(input) {
@@ -166,7 +205,28 @@ function normalizeSelectedChips(input) {
 
 function getPrompt(prompt) {
   const promptID = typeof prompt === "string" ? prompt : prompt?.id;
-  const match = JOURNAL_PROMPTS.find((candidate) => candidate.id === promptID);
+  const match = [
+    OUTSIDE_PLAN_PROMPT,
+    ...JOURNAL_PROMPTS,
+    {
+      id: "outside-plan-food",
+      text: "What food?",
+      supportsChips: false,
+      supportsDetail: false,
+    },
+    {
+      id: "outside-plan-time",
+      text: "What time of day?",
+      supportsChips: false,
+      supportsDetail: false,
+    },
+    {
+      id: "outside-plan-context",
+      text: "Context Tiles",
+      supportsChips: true,
+      supportsDetail: true,
+    },
+  ].find((candidate) => candidate.id === promptID);
 
   if (!match) {
     throw new TypeError(`Unknown journal prompt: ${promptID}`);

@@ -265,6 +265,38 @@ test("saving reflection writes one record per rendered prompt including blanks",
   assert.ok(state.answers.every((answer) => answer.breakthroughState === model.BREAKTHROUGH_STATES.none));
 });
 
+test("outside plan yes saves separately and swaps in specific follow-up prompts", async () => {
+  const { journalRepository } = await loadModules("outside-plan-save");
+
+  const saveResult = await journalRepository.saveReflection(DAY_ID, {
+    "outside-plan-check": { text: "yes" },
+    "outside-plan-food": { text: "Crackers" },
+    "outside-plan-time": { text: "Evening" },
+    "outside-plan-context": {
+      text: "",
+      selectedChipIDs: ["habit"],
+      detail: "Standing in the kitchen.",
+    },
+  }, { now: FIXED_NOW });
+  const state = await journalRepository.getJournalState(DAY_ID, { now: FIXED_NOW });
+
+  assert.equal(saveResult.available, true);
+  assert.equal(state.outsidePlanAnswer.text, "yes");
+  assert.deepEqual(state.prompts.map((prompt) => prompt.id), [
+    "outside-plan-food",
+    "outside-plan-time",
+    "outside-plan-context",
+    "baseline-helped",
+    "baseline-tomorrow",
+  ]);
+  assert.deepEqual(state.answers.map((answer) => answer.promptID), state.prompts.map((prompt) => prompt.id));
+  assert.equal(state.answers.find((answer) => answer.promptID === "outside-plan-food").text, "Crackers");
+  assert.deepEqual(state.answers.find((answer) => answer.promptID === "outside-plan-context").selectedChips, [
+    { id: "habit", label: "Habit" },
+  ]);
+  assert.equal(state.answers.find((answer) => answer.promptID === "outside-plan-context").detail, "Standing in the kitchen.");
+});
+
 test("remove and drop update breakthrough metadata without deleting the source answer", async () => {
   const { model, journalRepository } = await loadModules("breakthrough-metadata");
   const answerID = model.journalAnswerID(DAY_ID, "baseline-helped");

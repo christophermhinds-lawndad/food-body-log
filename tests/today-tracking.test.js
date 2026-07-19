@@ -541,6 +541,29 @@ test("skipped meals and daily weight upserts stay distinct", async () => {
   assert.equal(todayState.weight.value, 184.2);
 });
 
+test("weight changes over five pounds require same-value confirmation before saving", async () => {
+  const { repository } = await loadTrackingModules("weight-confirmation");
+  const priorDayID = "2026-07-17";
+
+  const priorWeight = await repository.saveWeight(priorDayID, "184.0", { now: FIXED_NOW });
+  const warning = await repository.saveWeight(TODAY_ID, "190.2", { now: FIXED_NOW });
+  const afterWarning = await repository.getTodayTrackingState({ now: FIXED_NOW });
+  const confirmed = await repository.saveWeight(TODAY_ID, "190.2", { now: FIXED_NOW, confirmLargeChange: true });
+
+  assert.equal(priorWeight.status, "Ready");
+  assert.equal(warning.available, true);
+  assert.equal(warning.status, "NeedsConfirmation");
+  assert.equal(warning.warning.code, "possible-weight-typo");
+  assert.equal(warning.warning.dayID, TODAY_ID);
+  assert.equal(warning.warning.priorDayID, priorDayID);
+  assert.equal(warning.warning.priorValue, 184);
+  assert.equal(warning.warning.value, 190.2);
+  assert.ok(warning.warning.difference > 6);
+  assert.equal(afterWarning.weight, null);
+  assert.equal(confirmed.status, "Ready");
+  assert.equal(confirmed.weight.value, 190.2);
+});
+
 test("undoing a skipped meal restores normal unanswered logging state", async () => {
   const { model, repository } = await loadTrackingModules("undo-skip");
 

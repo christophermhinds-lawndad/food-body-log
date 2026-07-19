@@ -186,6 +186,25 @@ export async function saveWeight(dayID, value, options = {}) {
   return withDb(async (db) => {
     const day = await ensureDay(db, dayID, options);
     await ensureMealsForDay(db, dayID, options);
+    const priorWeight = await getPriorWeight(db, dayID);
+    const difference = priorWeight?.value == null ? 0 : Math.abs(normalizedWeight - priorWeight.value);
+
+    if (difference > 5 && options.confirmLargeChange !== true) {
+      return {
+        status: "NeedsConfirmation",
+        day,
+        meals: await ensureMealsForDay(db, dayID, options),
+        weight: await getWeight(db, dayID),
+        warning: {
+          code: "possible-weight-typo",
+          dayID,
+          priorDayID: priorWeight.dayID,
+          priorValue: priorWeight.value,
+          value: normalizedWeight,
+          difference,
+        },
+      };
+    }
 
     const weight = {
       dayID,
@@ -279,6 +298,21 @@ async function getMeal(db, dayID, slot) {
 
 async function getWeight(db, dayID) {
   return await getRecord(db, WEIGHTS_STORE, dayID) || null;
+}
+
+async function getPriorWeight(db, dayID) {
+  return await getWeight(db, previousDayID(dayID));
+}
+
+function previousDayID(dayID) {
+  const [year, month, day] = String(dayID).split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() - 1);
+  const previousYear = date.getFullYear();
+  const previousMonth = String(date.getMonth() + 1).padStart(2, "0");
+  const previousDay = String(date.getDate()).padStart(2, "0");
+
+  return `${previousYear}-${previousMonth}-${previousDay}`;
 }
 
 function sortMeals(meals) {

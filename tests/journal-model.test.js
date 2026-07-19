@@ -97,6 +97,47 @@ test("journal prompts always include baseline prompts and only relevant deeper p
   ]);
 });
 
+test("outside plan yes replaces baseline feeling with specific follow-up prompts", async () => {
+  const model = await loadJournalModel("outside-plan");
+
+  assert.equal(model.OUTSIDE_PLAN_PROMPT.text, "Did I eat food outside of my plan, when I was not hungry?");
+  assert.deepEqual(model.promptsForMeals([], { outsidePlan: true }).map((prompt) => prompt.id), [
+    "outside-plan-food",
+    "outside-plan-time",
+    "outside-plan-context",
+    "baseline-helped",
+    "baseline-tomorrow",
+  ]);
+  assert.deepEqual(model.promptsForMeals([], { outsidePlan: false }).map((prompt) => prompt.id), [
+    "baseline-feeling",
+    "baseline-helped",
+    "baseline-tomorrow",
+  ]);
+});
+
+test("deeper journal prompts carry meal names that triggered them", async () => {
+  const model = await loadJournalModel("meal-context");
+  const prompts = model.promptsForMeals([
+    meal("breakfast", {
+      logState: MEAL_STATES.logged,
+      ateWhenHungry: MEAL_ANSWERS.no,
+      stoppedAtEnough: MEAL_ANSWERS.yes,
+    }),
+    meal("dinner", {
+      logState: MEAL_STATES.logged,
+      ateWhenHungry: MEAL_ANSWERS.yes,
+      stoppedAtEnough: MEAL_ANSWERS.no,
+    }),
+  ]);
+  const hungryPrompt = prompts.find((prompt) => prompt.id === "deeper-hungry");
+  const enoughPrompt = prompts.find((prompt) => prompt.id === "deeper-enough");
+
+  assert.equal(hungryPrompt.contextHeading, "Meals marked as eaten when not hungry");
+  assert.deepEqual(hungryPrompt.contextItems, ["Breakfast"]);
+  assert.equal(enoughPrompt.contextHeading, "Meals marked as eaten past enough");
+  assert.deepEqual(enoughPrompt.contextItems, ["Dinner"]);
+});
+
 test("journal chips use the locked v1 ids and labels", async () => {
   const model = await loadJournalModel("chips");
 

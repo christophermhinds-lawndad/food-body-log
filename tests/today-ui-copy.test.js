@@ -42,6 +42,7 @@ test("today and plan surfaces include the required Phase 2 copy", () => {
     "Save weight",
     "Weight saved for today.",
     "No weight entered today.",
+    "This is more than 5 pounds different from yesterday. Check for a typo, then tap Save weight again to confirm.",
     "Today's meals",
     "Plan meals",
     "Tomorrow",
@@ -114,6 +115,8 @@ test("save success paths require Ready status and guard stale plan days", () => 
   assert.match(appSource, /if \(selectedDayID !== planDayID\)/);
   assert.match(appSource, /selectedDayID === todayDayID && result\.day\.dayID === todayDayID/);
   assert.match(appSource, /if \(!isReadyResult\(result\)\)/);
+  assert.match(appSource, /result\.status === "NeedsConfirmation"/);
+  assert.match(appSource, /confirmLargeChange/);
 });
 
 test("today and plan storage paths refresh local day IDs before use", () => {

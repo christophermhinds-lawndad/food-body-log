@@ -3,9 +3,11 @@ import {
 } from "./tracking-model.js?v=3";
 import {
   BREAKTHROUGH_STATES,
+  OUTSIDE_PLAN_PROMPT,
+  OUTSIDE_PLAN_PROMPT_ID,
   createJournalAnswerRecord,
   promptsForMeals,
-} from "./journal-model.js?v=1";
+} from "./journal-model.js?v=2";
 import { openAppDb } from "./storage.js";
 
 const DAYS_STORE = "days";
@@ -18,6 +20,7 @@ const UNAVAILABLE = Object.freeze({
   meals: [],
   prompts: [],
   answers: [],
+  outsidePlanAnswer: null,
   breakthroughs: [],
 });
 
@@ -25,8 +28,10 @@ export async function getJournalState(dayID) {
   return withDb(async (db) => {
     const day = await getRecord(db, DAYS_STORE, dayID) || null;
     const meals = await getMealsByDay(db, dayID);
-    const prompts = promptsForMeals(meals);
-    const answers = sortAnswersForPrompts(await getAnswersByDay(db, dayID), prompts);
+    const allAnswers = await getAnswersByDay(db, dayID);
+    const outsidePlanAnswer = outsidePlanAnswerFrom(allAnswers);
+    const prompts = promptsForMeals(meals, { outsidePlan: outsidePlanAnswer?.text === "yes" });
+    const answers = sortAnswersForPrompts(allAnswers, prompts);
     const breakthroughs = sortBreakthroughs((await getBreakthroughRecords(db))
       .filter((answer) => answer.breakthroughState === BREAKTHROUGH_STATES.marked));
 
@@ -36,6 +41,7 @@ export async function getJournalState(dayID) {
       meals,
       prompts,
       answers,
+      outsidePlanAnswer,
       breakthroughs,
     };
   });
@@ -45,16 +51,26 @@ export async function saveReflection(dayID, answersByPrompt = {}, options = {}) 
   return withDb(async (db) => {
     const day = await getRecord(db, DAYS_STORE, dayID) || null;
     const meals = await getMealsByDay(db, dayID);
-    const prompts = promptsForMeals(meals);
     const existingAnswers = await getAnswersByDay(db, dayID);
     const existingByPromptID = new Map(existingAnswers.map((answer) => [answer.promptID, answer]));
-    const records = prompts.map((prompt) => createJournalAnswerRecord(
-      dayID,
-      prompt,
-      answersByPrompt?.[prompt.id] || {},
-      existingByPromptID.get(prompt.id) || null,
-      options,
-    ));
+    const outsidePlanAnswerInput = normalizeOutsidePlanAnswerInput(answersByPrompt?.[OUTSIDE_PLAN_PROMPT_ID]);
+    const prompts = promptsForMeals(meals, { outsidePlan: outsidePlanAnswerInput.text === "yes" });
+    const records = [
+      createJournalAnswerRecord(
+        dayID,
+        OUTSIDE_PLAN_PROMPT,
+        outsidePlanAnswerInput,
+        existingByPromptID.get(OUTSIDE_PLAN_PROMPT_ID) || null,
+        options,
+      ),
+      ...prompts.map((prompt) => createJournalAnswerRecord(
+        dayID,
+        prompt,
+        answersByPrompt?.[prompt.id] || {},
+        existingByPromptID.get(prompt.id) || null,
+        options,
+      )),
+    ];
 
     try {
       await putRecordsAtomically(db, JOURNAL_ANSWERS_STORE, records);
@@ -65,6 +81,7 @@ export async function saveReflection(dayID, answersByPrompt = {}, options = {}) 
         meals,
         prompts,
         answers: sortAnswersForPrompts(await getAnswersByDay(db, dayID), prompts),
+        outsidePlanAnswer: outsidePlanAnswerFrom(await getAnswersByDay(db, dayID)),
         breakthroughs: sortBreakthroughs(await getBreakthroughRecords(db)),
         error: {
           code: "reflection-save-failed",
@@ -79,6 +96,7 @@ export async function saveReflection(dayID, answersByPrompt = {}, options = {}) 
       meals,
       prompts,
       answers: sortAnswersForPrompts(await getAnswersByDay(db, dayID), prompts),
+      outsidePlanAnswer: outsidePlanAnswerFrom(await getAnswersByDay(db, dayID)),
       breakthroughs: sortBreakthroughs(await getBreakthroughRecords(db)),
     };
   });
@@ -274,12 +292,26 @@ function sortMeals(meals) {
 function sortAnswersForPrompts(answers, prompts) {
   const promptOrder = new Map(prompts.map((prompt, index) => [prompt.id, index]));
 
-  return [...answers].sort((left, right) => {
+  return [...answers].filter((answer) => promptOrder.has(answer.promptID)).sort((left, right) => {
     const leftOrder = promptOrder.has(left.promptID) ? promptOrder.get(left.promptID) : Number.MAX_SAFE_INTEGER;
     const rightOrder = promptOrder.has(right.promptID) ? promptOrder.get(right.promptID) : Number.MAX_SAFE_INTEGER;
 
     return leftOrder - rightOrder || left.id.localeCompare(right.id);
   });
+}
+
+function outsidePlanAnswerFrom(answers) {
+  return (answers || []).find((answer) => answer.promptID === OUTSIDE_PLAN_PROMPT_ID) || null;
+}
+
+function normalizeOutsidePlanAnswerInput(answer = {}) {
+  const text = answer?.text === "yes" || answer?.text === "no" ? answer.text : "";
+
+  return {
+    text,
+    selectedChipIDs: [],
+    detail: "",
+  };
 }
 
 function sortBreakthroughs(answers) {
