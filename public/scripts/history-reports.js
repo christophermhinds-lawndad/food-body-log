@@ -269,7 +269,7 @@ export function summarizeWeightChange(weights, options = {}) {
       ? `Your current trailing 7 day average is ${comparisonPhrase(priorComparison)} your 7 day trailing average from a week ago by ${formatSignedMagnitude(priorComparison.delta)} pounds, ${formatPercent(priorComparison.percent)}% of mass.`
       : REPORTS_COPY.weightSummaryPriorNoData,
     trailing30Comparison && trailing90Comparison
-      ? `You have ${gainedLostText(trailing30Comparison)} ${formatSignedMagnitude(trailing30Comparison.delta)} pounds, ${formatPercent(trailing30Comparison.percent)}% of total mass, compared to the trailing 30 day average, and ${gainedLostText(trailing90Comparison)} ${formatSignedMagnitude(trailing90Comparison.delta)} pounds, ${formatPercent(trailing90Comparison.percent)}% of total mass, compared to the 90 day average.`
+      ? `The current trailing 7 day average is ${comparisonDirectionText(trailing30Comparison)} by ${formatSignedMagnitude(trailing30Comparison.delta)} pounds, ${formatPercent(trailing30Comparison.percent)}% of total mass, compared to the trailing 30 day average, and ${comparisonDirectionText(trailing90Comparison)} by ${formatSignedMagnitude(trailing90Comparison.delta)} pounds, ${formatPercent(trailing90Comparison.percent)}% of total mass, compared to the 90 day average.`
       : REPORTS_COPY.weightSummaryLongWindowNoData,
   ];
 
@@ -618,16 +618,16 @@ function comparisonPhrase(comparison) {
   return "the same as";
 }
 
-function gainedLostText(comparison) {
+function comparisonDirectionText(comparison) {
   if (comparison.delta > 0) {
-    return "gained";
+    return "higher";
   }
 
   if (comparison.delta < 0) {
-    return "lost";
+    return "lower";
   }
 
-  return "changed by";
+  return "changed";
 }
 
 function formatSignedMagnitude(value) {

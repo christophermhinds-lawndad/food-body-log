@@ -499,10 +499,10 @@ test("weight report summary emits comparison narratives and threshold notices", 
     [90, "Ready", 202],
   ]);
   assert.equal(progressingState.weightSummary.notice.kind, "Progressing");
-  assert.equal(progressingState.weightSummary.notice.text, "Progressing: Data shows sustainable weight loss.");
+  assert.equal(progressingState.weightSummary.notice.text, "Weight notice: Saved entries are lower across some periods. These numbers are for observation only; no action is required here.");
   assert.match(progressingState.weightSummary.lines[0], /lower than your 7 day trailing average from a week ago by 1\.2 pounds, 0\.6% of mass\./);
-  assert.match(progressingState.weightSummary.lines[1], /lost 5 pounds, 2\.6% of total mass, compared to the trailing 30 day average/);
-  assert.match(progressingState.weightSummary.lines[1], /lost 12 pounds, 5\.9% of total mass, compared to the 90 day average\./);
+  assert.match(progressingState.weightSummary.lines[1], /lower by 5 pounds, 2\.6% of total mass, compared to the trailing 30 day average/);
+  assert.match(progressingState.weightSummary.lines[1], /lower by 12 pounds, 5\.9% of total mass, compared to the 90 day average\./);
 
   const considerMore = await loadModules("reports-consider-more");
   seedWeightRange(considerMore.db, -89, -30, 214);
@@ -512,7 +512,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
 
   const considerMoreState = await considerMore.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(considerMoreState.weightSummary.notice.kind, "ConsiderEatingMore");
-  assert.equal(considerMoreState.weightSummary.notice.text, "Consider Eating More: Current weight loss may trigger strong homeostatic response.");
+  assert.equal(considerMoreState.weightSummary.notice.text, "Weight notice: Saved entries are lower outside the recent comparison range. These numbers are for observation only; no action is required here.");
 
   const reflect = await loadModules("reports-reflect");
   seedWeightRange(reflect.db, -89, -30, 200);
@@ -522,7 +522,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
 
   const reflectState = await reflect.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(reflectState.weightSummary.notice.kind, "Reflect");
-  assert.equal(reflectState.weightSummary.notice.text, "Reflect: Data shows meaningful weight gain across some periods.");
+  assert.equal(reflectState.weightSummary.notice.text, "Weight notice: Saved entries are higher across some periods. These numbers are for observation only; no action is required here.");
 
   const stable = await loadModules("reports-stable");
   seedWeightRange(stable.db, -89, -30, 190);
@@ -532,7 +532,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
 
   const stableState = await stable.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(stableState.weightSummary.notice.kind, "Stable");
-  assert.equal(stableState.weightSummary.notice.text, "Weight Stable: Weight is not moving up or down. If you want to maintain this as baseline, no changes are needed.");
+  assert.equal(stableState.weightSummary.notice.text, "Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.");
 });
 
 test("history reports repository returns neutral unavailable results without IndexedDB", async () => {
