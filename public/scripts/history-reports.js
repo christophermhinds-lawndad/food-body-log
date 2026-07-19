@@ -35,6 +35,45 @@ const UNAVAILABLE = Object.freeze({
   mealMetrics: [],
 });
 
+export const HISTORY_COPY = Object.freeze({
+  title: "History",
+  loading: "Loading history...",
+  emptyHeading: "No history yet",
+  emptyBody: "Daily entries will appear here after you save meals, weight, or reflection.",
+  error: "History could not be loaded. Reopen the app and try again. Data already saved on this device stays local.",
+  editableBadge: "Editable",
+  readOnlyBadge: "Read-only",
+  readOnlyExplanation: "This day is outside the 72-hour edit window, so it is shown as a saved record.",
+  editableExplanation: "This day is still inside the 72-hour edit window.",
+  saveAction: "Save day",
+  saveSuccess: "Day saved.",
+  saveError: "Day could not be saved. Try again.",
+  noPlan: "No plan entered",
+  noWeight: "No weight entered",
+  noReflection: "No reflection saved",
+  noBreakthroughs: "No breakthroughs marked for this day",
+  sourceDayOpened: "Opened source day in History.",
+});
+
+export const REPORTS_COPY = Object.freeze({
+  title: "Reports",
+  intro: "Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.",
+  loading: "Loading reports...",
+  error: "Reports could not be loaded. Reopen the app and try again. Data already saved on this device stays local.",
+  weightHeading: "Weight averages",
+  weightSevenDays: "Trailing 7 days",
+  weightThirtyDays: "Trailing 30 days",
+  weightNinetyDays: "Trailing 90 days",
+  weightDenominator: "Based on {count} weight entry/entries in this period.",
+  weightNoData: "No weight data for this period.",
+  mealHeading: "Meal metrics",
+  hungryLabel: "Ate when hungry",
+  enoughLabel: "Stopped at enough",
+  mealDenominator: "{yesCount} Yes out of {denominator} logged non-skipped meals.",
+  mealNoData: "No logged meals for this period.",
+  mealInsufficient: "Not enough logged data yet. Logged non-skipped meals will count here.",
+});
+
 export async function getHistoryState(options = {}) {
   return withDb(async (db) => {
     const [days, meals, weights, answers] = await Promise.all([
