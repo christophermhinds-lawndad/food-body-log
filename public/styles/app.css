@@ -170,7 +170,7 @@ p {
 .metric-group label:focus-within,
 .tab-button:focus-visible {
   outline: 3px solid var(--accent);
-  outline-offset: 3px;
+  outline-offset: 4px;
 }
 
 .tracking-panel,
@@ -918,6 +918,39 @@ p {
 
 @media (max-width: 430px) {
   /* 390px iPhone history overflow backstop, reports overflow backstop, and settings backup overflow backstop */
+  .app-shell,
+  .meal-card-header,
+  .button-row,
+  .segmented-control,
+  .journal-prompt-card,
+  .breakthrough-card,
+  .history-list,
+  .day-detail,
+  .history-detail-section,
+  .history-chip-list,
+  .reports-view,
+  .weight-summary,
+  .weight-summary-lines,
+  .reports-section,
+  .reports-grid,
+  .report-card,
+  .backup-section,
+  .backup-warning,
+  .backup-controls,
+  .backup-file-control,
+  .backup-status,
+  .backup-selected-file,
+  .tab-bar,
+  .tab-button {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .app-shell {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
   .history-list,
   .day-detail,
   .history-detail-section,
@@ -937,6 +970,7 @@ p {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .meal-card-header,
   .day-detail-header,
   .history-value-row {
     align-items: stretch;
@@ -947,6 +981,14 @@ p {
     padding: 16px;
   }
 
+  .meal-card-header,
+  .button-row,
+  .segmented-control,
+  .breakthrough-card .button-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .journal-chip-list,
   .history-chip-list,
   .breakthrough-card .button-row {
@@ -954,14 +996,7 @@ p {
     grid-template-columns: 1fr;
   }
 
-  .backup-section,
-  .backup-warning,
-  .backup-controls,
-  .backup-export-control,
-  .backup-file-control,
-  .backup-status,
-  .backup-selected-file {
-    min-width: 0;
-    overflow-wrap: anywhere;
+  .tab-bar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
