@@ -101,6 +101,19 @@ test("history shell exposes browse detail and edit containers", () => {
   assert.match(html, /data-history-answer-template/);
 });
 
+test("reports shell exposes fixed numeric summary containers", () => {
+  assert.match(html, /data-view="reports"/);
+  assert.match(html, /class="view-panel reports-view"/);
+  assert.match(html, /id="reports-status" class="status-message" aria-live="polite"/);
+  assert.match(html, /id="weight-reports" class="reports-grid"/);
+  assert.match(html, /id="meal-reports" class="reports-grid"/);
+  assert.match(html, /data-report-tile-template/);
+  assert.match(html, /Weight averages/);
+  assert.match(html, /Meal metrics/);
+  assert.match(html, /Numeric summaries use only saved local entries/);
+  assert.equal((html.match(/data-report-tile/g) || []).length, 5);
+});
+
 test("journal styling uses compact mobile-safe cards chips and actions", () => {
   for (const selector of [
     ".journal-section",

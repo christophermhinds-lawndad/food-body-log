@@ -208,15 +208,77 @@ test("history styles extend focus-visible coverage and avoid destructive control
   assert.doesNotMatch(historyDayTemplateHtml(), /history-detail-section/);
 });
 
+test("reports shell exposes fixed numeric groups and tile template", () => {
+  for (const expected of [
+    'class="reports-view"',
+    'id="reports-status"',
+    'id="weight-reports"',
+    'id="meal-reports"',
+    "data-report-tile-template",
+    "Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.",
+    "Weight averages",
+    "Meal metrics",
+    "Trailing 7 days",
+    "Trailing 30 days",
+    "Trailing 90 days",
+    "Ate when hungry",
+    "Stopped at enough",
+  ]) {
+    assert.match(html, new RegExp(escapeRegExp(expected)), `missing Reports shell artifact ${expected}`);
+  }
+
+  assert.equal((reportsPanelHtml().match(/data-report-tile/g) || []).length, 5);
+  assert.doesNotMatch(reportsPanelHtml(), /<canvas\b|<svg\b|<table\b/i);
+});
+
+test("reports controller loads local DTOs and renders fixed sparse-safe tiles", () => {
+  for (const symbol of [
+    "REPORTS_COPY",
+    "getReportsState",
+    "loadReportsView",
+    "renderReportsState",
+    "renderWeightReportTile",
+    "renderMealReportTile",
+    "reportValueText",
+    "reportDenominatorText",
+  ]) {
+    assert.match(appSource, new RegExp(`\\b${symbol}\\b`), `missing controller symbol ${symbol}`);
+  }
+
+  assert.match(appSource, /if\s*\(\s*tabName === "reports"\s*\)[\s\S]*loadReportsView\(\)/);
+  assert.match(appSource, /reportsLoadRequestID/);
+  assert.match(appSource, /requestID !== reportsLoadRequestID/);
+  assert.match(reportsControllerSlice(), /state\.weightAverages/);
+  assert.match(reportsControllerSlice(), /state\.mealMetrics/);
+  assert.match(reportsControllerSlice(), /REPORTS_COPY\.weightNoData/);
+  assert.match(reportsControllerSlice(), /REPORTS_COPY\.mealNoData/);
+  assert.match(reportsControllerSlice(), /REPORTS_COPY\.mealInsufficient/);
+  assert.match(reportsControllerSlice(), /setText\(/);
+  assert.doesNotMatch(reportsControllerSlice(), /\.innerHTML\s*=|insertAdjacentHTML\s*\(|outerHTML\s*=/);
+  assert.doesNotMatch(reportsControllerSlice(), /\b(savePlan|saveMealLog|saveWeight|saveReflection|saveHistoryDay|fetch|XMLHttpRequest)\s*\(/);
+});
+
 function historyPanelHtml() {
   const start = html.indexOf('data-view="history"');
   const end = html.indexOf('data-view="settings"', start);
   return start >= 0 && end > start ? html.slice(start, end) : "";
 }
 
+function reportsPanelHtml() {
+  const start = html.indexOf('data-view="reports"');
+  const end = html.indexOf('data-view="journal"', start);
+  return start >= 0 && end > start ? html.slice(start, end) : "";
+}
+
 function historyControllerSlice() {
   const start = appSource.indexOf("async function loadHistoryView");
   const end = appSource.indexOf("async function saveTodayWeight");
+  return start >= 0 && end > start ? appSource.slice(start, end) : "";
+}
+
+function reportsControllerSlice() {
+  const start = appSource.indexOf("async function loadReportsView");
+  const end = appSource.indexOf("async function loadJournalView");
   return start >= 0 && end > start ? appSource.slice(start, end) : "";
 }
 
