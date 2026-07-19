@@ -8,6 +8,7 @@ import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, s
 import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
 import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=2";
 import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough } from "./journal-tracking.js?v=2";
+import { HISTORY_COPY, getHistoryDay, getHistoryState, saveHistoryDay } from "./history-reports.js?v=1";
 
 const appPaths = createAppPaths();
 
@@ -40,20 +41,41 @@ const breakthroughList = document.querySelector("#breakthrough-list");
 const breakthroughMessage = document.querySelector("#breakthrough-message");
 const journalPromptTemplate = document.querySelector("[data-journal-prompt-template]");
 const breakthroughTemplate = document.querySelector("[data-breakthrough-template]");
+const historyStatus = document.querySelector("#history-status");
+const historyList = document.querySelector("#history-list");
+const historyDetail = document.querySelector("#history-detail");
+const historyDetailTitle = document.querySelector("#history-detail-title");
+const historySaveMessage = document.querySelector("#history-save-message");
+const historyDetailDate = document.querySelector("[data-history-detail-date]");
+const historyEditBadge = document.querySelector("[data-history-edit-badge]");
+const historyEditCopy = document.querySelector("[data-history-edit-copy]");
+const historyWeightSection = document.querySelector("[data-history-weight-section]");
+const historyMealList = document.querySelector("[data-history-meal-list]");
+const historyAnswerList = document.querySelector("[data-history-answer-list]");
+const historyBreakthroughSection = document.querySelector("[data-history-breakthrough-section]");
+const historySaveButton = document.querySelector("[data-history-save]");
+const historyDayTemplate = document.querySelector("[data-history-day-template]");
+const historyMealTemplate = document.querySelector("[data-history-meal-template]");
+const historyAnswerTemplate = document.querySelector("[data-history-answer-template]");
 const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded. You can keep typing.";
 const JOURNAL_LOAD_MESSAGE = "Loading evening reflection...";
 const JOURNAL_UNAVAILABLE_MESSAGE = "Evening reflection could not be loaded. Reopen the app and try again.";
 const JOURNAL_SAVE_ERROR_MESSAGE = "Reflection could not be saved. Try again; data already saved on this device stays local.";
 const NO_EXTRA_PROMPTS_MESSAGE = "Nothing extra to reflect on from today's meal answers. You can still write anything that feels useful.";
 const MISSING_MEAL_DATA_MESSAGE = "Not all meals are logged yet. That is okay; only logged non-skipped No answers add extra prompts.";
-const SOURCE_DAY_MESSAGE = "Source-day navigation will open this day when History is available.";
 const DROP_SUCCESS_MESSAGE = "Breakthrough removed. The original answer stayed saved.";
 let todayDayID = getTodayDayID();
 let planDayID = getTomorrowDayID();
 let journalDayID = todayDayID;
+let historySelectedDayID = "";
 let journalLoadRequestID = 0;
+let historyLoadRequestID = 0;
+let historyDayLoadRequestID = 0;
 let currentJournalState = null;
+let currentHistoryDayState = null;
 let pendingWeightConfirmation = null;
+let pendingHistoryWeightConfirmation = null;
+let pendingHistorySourceDayID = "";
 const planSuggestions = createPlanSuggestionController({
   document,
   getPlanSuggestions,
@@ -168,11 +190,33 @@ breakthroughList?.addEventListener("click", (event) => {
   const dropButton = event.target?.closest?.("[data-drop-breakthrough]");
 
   if (sourceButton) {
-    showSourceDayMessage(sourceButton);
+    const card = sourceButton.closest("[data-breakthrough-card]");
+    openHistorySourceDay(card?.dataset.dayId || journalDayID);
   }
 
   if (dropButton) {
     dropSelectedBreakthrough(dropButton);
+  }
+});
+
+historyList?.addEventListener("click", (event) => {
+  const button = event.target?.closest?.("[data-history-day]");
+
+  if (button?.dataset.dayId) {
+    loadSelectedHistoryDay(button.dataset.dayId, { focusDetail: true });
+  }
+});
+
+historyDetail?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveSelectedHistoryDay();
+});
+
+historyDetail?.addEventListener("click", (event) => {
+  const chipButton = event.target?.closest?.("[data-history-answer-chip]");
+
+  if (chipButton) {
+    toggleHistoryAnswerChip(chipButton);
   }
 });
 
@@ -204,6 +248,10 @@ function selectTab(tabName) {
 
   if (tabName === "journal") {
     loadJournalView();
+  }
+
+  if (tabName === "history") {
+    loadHistoryView();
   }
 }
 
@@ -469,10 +517,552 @@ async function dropSelectedBreakthrough(button) {
   setText(breakthroughMessage, DROP_SUCCESS_MESSAGE);
 }
 
-function showSourceDayMessage(button) {
-  const card = button.closest("[data-breakthrough-card]");
-  const dayID = card?.dataset.dayId || journalDayID;
-  setText(breakthroughMessage, `${SOURCE_DAY_MESSAGE} Source day: ${dayID}.`);
+async function loadHistoryView() {
+  const requestID = historyLoadRequestID + 1;
+  historyLoadRequestID = requestID;
+  setText(historyStatus, HISTORY_COPY.loading);
+  setText(historySaveMessage, "");
+  const state = await getHistoryState();
+
+  if (requestID !== historyLoadRequestID) {
+    return;
+  }
+
+  renderHistoryState(state);
+  const sourceDayID = pendingHistorySourceDayID;
+  pendingHistorySourceDayID = "";
+
+  if (!state.available) {
+    return;
+  }
+
+  if (sourceDayID) {
+    await loadSelectedHistoryDay(sourceDayID, {
+      sourceDay: true,
+      focusDetail: true,
+    });
+    return;
+  }
+
+  if (state.days.length === 0) {
+    return;
+  }
+
+  const selectedDayID = sourceDayID
+    || (state.days.some((day) => day.dayID === historySelectedDayID) ? historySelectedDayID : state.days[0].dayID);
+  await loadSelectedHistoryDay(selectedDayID, {
+    sourceDay: false,
+    focusDetail: false,
+  });
+}
+
+async function loadSelectedHistoryDay(dayID, options = {}) {
+  const requestedDayID = String(dayID || "");
+
+  if (!requestedDayID) {
+    return;
+  }
+
+  const requestID = historyDayLoadRequestID + 1;
+  historyDayLoadRequestID = requestID;
+  historySelectedDayID = requestedDayID;
+  markSelectedHistoryDay(requestedDayID);
+  setText(historyDetailTitle, requestedDayID);
+  setText(historySaveMessage, "");
+  setText(historyStatus, HISTORY_COPY.loading);
+  const state = await getHistoryDay(requestedDayID);
+
+  if (requestID !== historyDayLoadRequestID || requestedDayID !== historySelectedDayID) {
+    return;
+  }
+
+  if (!state.available) {
+    setText(historyStatus, HISTORY_COPY.error);
+    return;
+  }
+
+  renderHistoryDayDetail(state);
+  setText(historyStatus, options.sourceDay ? HISTORY_COPY.sourceDayOpened : "");
+
+  if (options.focusDetail) {
+    focusHistoryDetail();
+  }
+}
+
+function renderHistoryState(state) {
+  replaceChildren(historyList);
+  currentHistoryDayState = null;
+  setText(historySaveMessage, "");
+
+  if (!state.available) {
+    historyDetail.hidden = true;
+    setText(historyStatus, HISTORY_COPY.error);
+    return;
+  }
+
+  if (!state.days.length) {
+    historyDetail.hidden = true;
+    renderHistoryEmptyState();
+    return;
+  }
+
+  setText(historyStatus, state.days.length === 1 ? "1 day with saved entries." : `${state.days.length} days with saved entries.`);
+
+  for (const day of state.days) {
+    historyList?.append(renderHistoryDayCard(day));
+  }
+}
+
+function renderHistoryDayDetail(dayState) {
+  currentHistoryDayState = dayState;
+  const dayID = dayState.day?.dayID || historySelectedDayID;
+  const isEditable = dayState.editStatus === "Editable";
+  historyDetail.hidden = false;
+  historyDetail.dataset.editStatus = dayState.editStatus || "";
+  setText(historyDetailDate, dayID);
+  setText(historyDetailTitle, dayID);
+  historyEditBadge.hidden = false;
+  historyEditBadge.className = isEditable ? "editable-badge" : "read-only-badge";
+  setText(historyEditBadge, isEditable ? HISTORY_COPY.editableBadge : HISTORY_COPY.readOnlyBadge);
+  setText(historyEditCopy, isEditable ? HISTORY_COPY.editableExplanation : HISTORY_COPY.readOnlyExplanation);
+  renderHistoryWeight(dayState.weight, isEditable);
+  renderHistoryMeals(dayState.meals, isEditable);
+  renderHistoryAnswers(dayState.answers, isEditable);
+  renderHistoryBreakthroughs(dayState.breakthroughs);
+  historySaveButton.hidden = !isEditable;
+  setText(historySaveButton, HISTORY_COPY.saveAction);
+  markSelectedHistoryDay(dayID);
+}
+
+async function saveSelectedHistoryDay() {
+  const selectedDayID = historySelectedDayID;
+
+  if (!selectedDayID || currentHistoryDayState?.editStatus !== "Editable") {
+    setText(historySaveMessage, HISTORY_COPY.saveError);
+    return;
+  }
+
+  const draft = serializeHistoryDraft();
+  const requestedWeight = draft.weight?.value ?? "";
+  const result = await saveHistoryDay(selectedDayID, draft, {
+    confirmLargeChange: pendingHistoryWeightConfirmation?.dayID === selectedDayID
+      && pendingHistoryWeightConfirmation?.value === requestedWeight,
+  });
+
+  if (selectedDayID !== historySelectedDayID) {
+    return;
+  }
+
+  if (!isReadyResult(result)) {
+    if (result?.status === "NeedsConfirmation") {
+      pendingHistoryWeightConfirmation = { dayID: selectedDayID, value: requestedWeight };
+      setText(historySaveMessage, "This weight is more than 5 pounds different from the prior day. Check for a typo, then tap Save day again to confirm.");
+      return;
+    }
+
+    pendingHistoryWeightConfirmation = null;
+    setText(historySaveMessage, HISTORY_COPY.saveError);
+    return;
+  }
+
+  pendingHistoryWeightConfirmation = null;
+  renderHistoryDayDetail(result);
+  setText(historySaveMessage, HISTORY_COPY.saveSuccess);
+}
+
+function serializeHistoryDraft() {
+  return {
+    weight: {
+      value: historyDetail?.querySelector("[data-history-weight-input]")?.value || "",
+    },
+    meals: Object.fromEntries(Array.from(historyDetail?.querySelectorAll("[data-history-meal-card]") || [])
+      .map((card) => {
+        const slot = card.dataset.slot;
+        return [slot, {
+          plannedText: card.querySelector("[data-history-meal-plan]")?.value || "",
+          logState: card.querySelector("[data-history-meal-state]")?.value || MEAL_STATES.notLogged,
+          ateWhenHungry: selectedMetricValue(card, `history-${slot}-hungry`) || MEAL_ANSWERS.unanswered,
+          stoppedAtEnough: selectedMetricValue(card, `history-${slot}-enough`) || MEAL_ANSWERS.unanswered,
+        }];
+      })),
+    answers: Object.fromEntries(Array.from(historyDetail?.querySelectorAll("[data-history-answer-card]") || [])
+      .map((card) => [card.dataset.promptId, {
+        text: card.querySelector("[data-history-answer-text]")?.value || "",
+        selectedChipIDs: Array.from(card.querySelectorAll("[data-history-answer-chip][aria-pressed='true']"))
+          .map((button) => button.dataset.historyAnswerChip),
+        detail: card.querySelector("[data-history-answer-detail]")?.value || "",
+      }])),
+  };
+}
+
+function openHistorySourceDay(dayID) {
+  const requestedDayID = String(dayID || "");
+
+  if (!requestedDayID) {
+    setText(breakthroughMessage, HISTORY_COPY.error);
+    return;
+  }
+
+  pendingHistorySourceDayID = requestedDayID;
+  historySelectedDayID = requestedDayID;
+  selectTab("history");
+}
+
+function renderHistoryEmptyState() {
+  const empty = document.createElement("article");
+  const heading = document.createElement("h3");
+  const copy = document.createElement("p");
+  empty.className = "history-day-card history-empty";
+  setText(heading, HISTORY_COPY.emptyHeading);
+  setText(copy, HISTORY_COPY.emptyBody);
+  empty.append(heading, copy);
+  historyList?.append(empty);
+  setText(historyStatus, "");
+}
+
+function renderHistoryDayCard(day) {
+  const fragment = historyDayTemplate?.content.firstElementChild.cloneNode(true);
+  const card = fragment || document.createElement("article");
+  const button = card.querySelector("[data-history-day]") || document.createElement("button");
+  const dateNode = card.querySelector("[data-history-day-date]");
+  const summaryNode = card.querySelector("[data-history-day-summary]");
+
+  card.dataset.dayId = day.dayID;
+  button.dataset.dayId = day.dayID;
+  setText(dateNode, day.dayID);
+  setText(summaryNode, historyDaySummary(day));
+  card.classList.toggle("is-selected", day.dayID === historySelectedDayID);
+  button.setAttribute("aria-current", day.dayID === historySelectedDayID ? "true" : "false");
+
+  return card;
+}
+
+function historyDaySummary(day) {
+  const content = day?.content || {};
+  const parts = [];
+
+  if (content.hasMeals) {
+    parts.push("meals");
+  }
+
+  if (content.hasWeight) {
+    parts.push("weight");
+  }
+
+  if (content.hasReflection) {
+    parts.push("reflection");
+  }
+
+  if (content.hasBreakthroughs) {
+    parts.push("breakthroughs");
+  }
+
+  return parts.length ? `Saved ${parts.join(", ")}.` : "Saved entry.";
+}
+
+function markSelectedHistoryDay(dayID) {
+  historyList?.querySelectorAll(".history-day-card").forEach((card) => {
+    const selected = card.dataset.dayId === dayID;
+    card.classList.toggle("is-selected", selected);
+    card.querySelector("[data-history-day]")?.setAttribute("aria-current", selected ? "true" : "false");
+  });
+}
+
+function renderHistoryWeight(weight, isEditable) {
+  replaceChildren(historyWeightSection);
+  const section = document.createElement("section");
+  const heading = document.createElement("h3");
+  section.className = "history-detail-section";
+  setText(heading, "Weight");
+  section.append(heading);
+
+  if (isEditable) {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    label.className = "field-label";
+    label.setAttribute("for", "history-weight-value");
+    setText(label, "Weight");
+    input.id = "history-weight-value";
+    input.className = "text-field";
+    input.type = "number";
+    input.inputMode = "decimal";
+    input.step = "0.1";
+    input.min = "0";
+    input.dataset.historyWeightInput = "true";
+    input.value = weight?.value == null ? "" : String(weight.value);
+    section.append(label, input);
+  } else {
+    section.append(createValueRow("Weight", weight?.value == null ? HISTORY_COPY.noWeight : String(weight.value)));
+  }
+
+  historyWeightSection?.append(section);
+}
+
+function renderHistoryMeals(meals, isEditable) {
+  replaceChildren(historyMealList);
+
+  for (const meal of meals || []) {
+    historyMealList?.append(renderHistoryMealCard(meal, isEditable));
+  }
+}
+
+function renderHistoryMealCard(meal, isEditable) {
+  const fragment = historyMealTemplate?.content.firstElementChild.cloneNode(true);
+  const card = fragment || document.createElement("article");
+  const title = card.querySelector("[data-history-meal-title]");
+  const body = card.querySelector("[data-history-meal-body]");
+  const slot = meal.slot;
+
+  card.dataset.slot = slot;
+  setText(title, meal.slotLabel || mealLabel(slot));
+  replaceChildren(body);
+
+  if (isEditable) {
+    body?.append(
+      createTextareaField(`history-${slot}-plan`, "Plan", "historyMealPlan", meal.plannedText || ""),
+      createMealStateControl(meal),
+      createMetricControl(`history-${slot}-hungry`, "Ate when hungry?", meal.ateWhenHungry),
+      createMetricControl(`history-${slot}-enough`, "Stopped at enough?", meal.stoppedAtEnough),
+    );
+  } else {
+    body?.append(
+      createValueRow("Plan", meal.plannedText || HISTORY_COPY.noPlan),
+      createValueRow("Status", mealStatusLabel(meal.logState)),
+      createValueRow("Ate when hungry?", metricLabel(meal.ateWhenHungry)),
+      createValueRow("Stopped at enough?", metricLabel(meal.stoppedAtEnough)),
+    );
+  }
+
+  return card;
+}
+
+function createMealStateControl(meal) {
+  const label = document.createElement("label");
+  const select = document.createElement("select");
+  label.className = "field-label";
+  label.setAttribute("for", `history-${meal.slot}-state`);
+  setText(label, "Log status");
+  select.id = `history-${meal.slot}-state`;
+  select.className = "text-field";
+  select.dataset.historyMealState = "true";
+
+  for (const [value, copy] of [
+    [MEAL_STATES.notLogged, "Not logged"],
+    [MEAL_STATES.logged, "Logged"],
+    [MEAL_STATES.skipped, "Skipped"],
+  ]) {
+    const option = document.createElement("option");
+    option.value = value;
+    setText(option, copy);
+    select.append(option);
+  }
+
+  select.value = meal.logState || MEAL_STATES.notLogged;
+
+  const group = document.createElement("div");
+  group.className = "history-field-stack";
+  group.append(label, select);
+  return group;
+}
+
+function createMetricControl(name, legendCopy, value) {
+  const fieldset = document.createElement("fieldset");
+  const legend = document.createElement("legend");
+  fieldset.className = "metric-group";
+  setText(legend, legendCopy);
+  fieldset.append(legend);
+
+  for (const [answerValue, copy] of [
+    [MEAL_ANSWERS.yes, "Yes"],
+    [MEAL_ANSWERS.no, "No"],
+  ]) {
+    const label = document.createElement("label");
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = name;
+    input.value = answerValue;
+    input.checked = value === answerValue;
+    label.append(input, document.createTextNode(` ${copy}`));
+    fieldset.append(label);
+  }
+
+  return fieldset;
+}
+
+function renderHistoryAnswers(answers, isEditable) {
+  replaceChildren(historyAnswerList);
+
+  if (!answers?.length) {
+    const section = document.createElement("section");
+    const heading = document.createElement("h3");
+    section.className = "history-detail-section";
+    setText(heading, "Reflection");
+    section.append(heading, createValueRow("Reflection", HISTORY_COPY.noReflection));
+    historyAnswerList?.append(section);
+    return;
+  }
+
+  for (const answer of answers) {
+    historyAnswerList?.append(renderHistoryAnswerCard(answer, isEditable));
+  }
+}
+
+function renderHistoryAnswerCard(answer, isEditable) {
+  const fragment = historyAnswerTemplate?.content.firstElementChild.cloneNode(true);
+  const card = fragment || document.createElement("article");
+  const label = card.querySelector("[data-history-answer-label]");
+  const body = card.querySelector("[data-history-answer-body]");
+  const textID = `history-${answer.promptID}-answer`;
+
+  card.dataset.promptId = answer.promptID;
+  setText(label, answer.promptText || answer.promptID);
+  replaceChildren(body);
+
+  if (isEditable) {
+    const textField = createTextareaField(textID, answer.promptText || "Reflection answer", "historyAnswerText", answer.text || "");
+    body?.append(textField);
+
+    if (answer.supportsChips) {
+      body?.append(createHistoryChipGroup(answer.selectedChips || [], true));
+    }
+
+    if (answer.supportsDetail) {
+      body?.append(createTextareaField(`${textID}-detail`, "Optional detail", "historyAnswerDetail", answer.detail || ""));
+    }
+  } else {
+    body?.append(createValueRow("Answer", answer.text || HISTORY_COPY.noReflection));
+
+    if (answer.selectedChips?.length) {
+      body?.append(createValueRow("Context", answer.selectedChips.map((chip) => chip.label).join(", ")));
+    }
+
+    if (answer.detail) {
+      body?.append(createValueRow("Detail", answer.detail));
+    }
+  }
+
+  return card;
+}
+
+function createHistoryChipGroup(selectedChips, editable) {
+  const group = document.createElement("fieldset");
+  const legend = document.createElement("legend");
+  const list = document.createElement("div");
+  const selectedIDs = new Set(selectedChips.map((chip) => chip.id));
+  group.className = "journal-chip-group";
+  list.className = "journal-chip-list history-chip-list";
+  setText(legend, "Optional context");
+  group.append(legend, list);
+
+  if (!editable) {
+    setText(list, selectedChips.map((chip) => chip.label).join(", "));
+    return group;
+  }
+
+  for (const chip of JOURNAL_CHIPS) {
+    const button = document.createElement("button");
+    const selected = selectedIDs.has(chip.id);
+    button.type = "button";
+    button.className = "secondary-action journal-chip";
+    button.dataset.historyAnswerChip = chip.id;
+    button.setAttribute("aria-pressed", String(selected));
+    setText(button, selected ? `✓ ${chip.label}` : chip.label);
+    list.append(button);
+  }
+
+  return group;
+}
+
+function renderHistoryBreakthroughs(breakthroughs) {
+  replaceChildren(historyBreakthroughSection);
+  const section = document.createElement("section");
+  const heading = document.createElement("h3");
+  section.className = "history-detail-section";
+  setText(heading, "Breakthroughs");
+  section.append(heading);
+
+  if (!breakthroughs?.length) {
+    section.append(createValueRow("Breakthrough status", HISTORY_COPY.noBreakthroughs));
+    historyBreakthroughSection?.append(section);
+    return;
+  }
+
+  for (const breakthrough of breakthroughs) {
+    const row = createValueRow(breakthrough.promptText || "Breakthrough", breakthrough.text || HISTORY_COPY.noReflection);
+    section.append(row);
+  }
+
+  historyBreakthroughSection?.append(section);
+}
+
+function createTextareaField(id, labelCopy, dataKey, value) {
+  const group = document.createElement("div");
+  const label = document.createElement("label");
+  const textarea = document.createElement("textarea");
+  group.className = "history-field-stack";
+  label.className = "field-label";
+  label.setAttribute("for", id);
+  setText(label, labelCopy);
+  textarea.id = id;
+  textarea.className = "text-field journal-textarea";
+  textarea.rows = 3;
+  textarea.dataset[dataKey] = "true";
+  textarea.value = value || "";
+  group.append(label, textarea);
+
+  return group;
+}
+
+function createValueRow(labelCopy, valueCopy) {
+  const row = document.createElement("div");
+  const label = document.createElement("p");
+  const value = document.createElement("p");
+  row.className = "history-value-row";
+  label.className = "field-label";
+  setText(label, labelCopy);
+  setText(value, valueCopy || "");
+  row.append(label, value);
+
+  return row;
+}
+
+function toggleHistoryAnswerChip(button) {
+  const selected = button.getAttribute("aria-pressed") === "true";
+  const chip = JOURNAL_CHIPS.find((candidate) => candidate.id === button.dataset.historyAnswerChip);
+  button.setAttribute("aria-pressed", String(!selected));
+  setText(button, !selected ? `✓ ${chip?.label || ""}` : chip?.label || "");
+}
+
+function focusHistoryDetail() {
+  const firstControl = historyDetail?.querySelector("input, select, textarea, button:not([hidden])");
+
+  if (firstControl) {
+    firstControl.focus({ preventScroll: true });
+    return;
+  }
+
+  historyDetailTitle?.focus({ preventScroll: true });
+}
+
+function metricLabel(value) {
+  if (value === MEAL_ANSWERS.yes) {
+    return "Yes";
+  }
+
+  if (value === MEAL_ANSWERS.no) {
+    return "No";
+  }
+
+  return "Not logged";
+}
+
+function mealLabel(slot) {
+  return {
+    breakfast: "Breakfast",
+    lunch: "Lunch",
+    dinner: "Dinner",
+    snack: "Optional Snack",
+  }[slot] || "Meal";
 }
 
 async function saveTodayWeight() {

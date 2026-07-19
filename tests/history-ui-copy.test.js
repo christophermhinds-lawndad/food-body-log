@@ -169,7 +169,9 @@ test("history dynamic rendering uses text-safe sinks and form values instead of 
 });
 
 function historyPanelHtml() {
-  return html.match(/<section class="view-panel[^"]*" data-view="history"[\s\S]*?<\/section>/)?.[0] || "";
+  const start = html.indexOf('data-view="history"');
+  const end = html.indexOf('data-view="settings"', start);
+  return start >= 0 && end > start ? html.slice(start, end) : "";
 }
 
 function historyControllerSlice() {

@@ -249,9 +249,49 @@
           </template>
         </section>
 
-        <section class="view-panel" data-view="history" hidden>
+        <section class="view-panel history-view" data-view="history" hidden>
           <h2>History</h2>
-          <p>Prior day review arrives after local daily records exist.</p>
+          <p id="history-status" class="status-message" aria-live="polite">Loading history...</p>
+          <div id="history-list" class="history-list" aria-live="polite"></div>
+          <form id="history-detail" class="day-detail" hidden>
+            <header class="day-detail-header">
+              <div>
+                <p class="date-heading" data-history-detail-date></p>
+                <h2 id="history-detail-title" tabindex="-1">Select a day</h2>
+              </div>
+              <p class="editable-badge" data-history-edit-badge aria-label="Editable or Read-only" hidden>Editable</p>
+            </header>
+            <p class="note" data-history-edit-copy></p>
+            <div data-history-weight-section></div>
+            <div data-history-meal-list></div>
+            <div data-history-answer-list></div>
+            <div data-history-breakthrough-section></div>
+            <button class="primary-action compact-action" type="submit" data-history-save>Save day</button>
+            <p id="history-save-message" class="status-message" aria-live="polite"></p>
+          </form>
+
+          <template data-history-day-template>
+            <article class="history-day-card">
+              <button class="history-day-button" type="button" data-history-day>
+                <span class="date-heading" data-history-day-date></span>
+                <span class="history-day-summary" data-history-day-summary></span>
+              </button>
+            </article>
+          </template>
+
+          <template data-history-meal-template>
+            <article class="history-detail-section" data-history-meal-card>
+              <h3 data-history-meal-title></h3>
+              <div data-history-meal-body></div>
+            </article>
+          </template>
+
+          <template data-history-answer-template>
+            <article class="history-detail-section" data-history-answer-card>
+              <label class="field-label" data-history-answer-label></label>
+              <div data-history-answer-body></div>
+            </article>
+          </template>
         </section>
 
         <section class="view-panel settings-panel" data-view="settings" hidden>

@@ -89,6 +89,18 @@ test("journal shell exposes reflection and breakthrough containers", () => {
   assert.match(html, /data-breakthrough-template/);
 });
 
+test("history shell exposes browse detail and edit containers", () => {
+  assert.match(html, /data-view="history"/);
+  assert.match(html, /id="history-status" class="status-message" aria-live="polite"/);
+  assert.match(html, /id="history-list" class="history-list" aria-live="polite"/);
+  assert.match(html, /id="history-detail" class="day-detail" hidden/);
+  assert.match(html, /id="history-detail-title" tabindex="-1"/);
+  assert.match(html, /id="history-save-message" class="status-message" aria-live="polite"/);
+  assert.match(html, /data-history-day-template/);
+  assert.match(html, /data-history-meal-template/);
+  assert.match(html, /data-history-answer-template/);
+});
+
 test("journal styling uses compact mobile-safe cards chips and actions", () => {
   for (const selector of [
     ".journal-section",
