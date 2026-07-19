@@ -179,6 +179,12 @@ test("history dynamic rendering uses text-safe sinks and form values instead of 
   assert.match(historyControllerSlice(), /\.value\s*=/);
 });
 
+test("history draft serialization omits blank weight when no weight exists", () => {
+  assert.match(historyControllerSlice(), /const weightValue = historyDetail\?\.querySelector\("\[data-history-weight-input\]"\)\?\.value\?\.trim\(\) \|\| "";/);
+  assert.match(historyControllerSlice(), /if \(weightValue !== "" \|\| currentHistoryDayState\?\.weight\?\.value != null\) \{/);
+  assert.match(historyControllerSlice(), /draft\.weight = \{ value: weightValue \};/);
+});
+
 test("history styles provide required mobile-safe selectors and wrapping backstops", () => {
   for (const selector of [
     ".history-list",

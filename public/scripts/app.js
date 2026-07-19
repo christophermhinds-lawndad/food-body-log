@@ -1046,10 +1046,8 @@ async function saveSelectedHistoryDay() {
 }
 
 function serializeHistoryDraft() {
-  return {
-    weight: {
-      value: historyDetail?.querySelector("[data-history-weight-input]")?.value || "",
-    },
+  const weightValue = historyDetail?.querySelector("[data-history-weight-input]")?.value?.trim() || "";
+  const draft = {
     meals: Object.fromEntries(Array.from(historyDetail?.querySelectorAll("[data-history-meal-card]") || [])
       .map((card) => {
         const slot = card.dataset.slot;
@@ -1068,6 +1066,12 @@ function serializeHistoryDraft() {
         detail: card.querySelector("[data-history-answer-detail]")?.value || "",
       }])),
   };
+
+  if (weightValue !== "" || currentHistoryDayState?.weight?.value != null) {
+    draft.weight = { value: weightValue };
+  }
+
+  return draft;
 }
 
 function openHistorySourceDay(dayID) {

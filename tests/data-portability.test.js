@@ -393,6 +393,28 @@ test("invalid backups are rejected before any write transaction opens", async ()
       payload.data.days[0].dayID = "07/17/2026";
       return payload;
     })(), "invalid-record"],
+    ["impossible day date", (() => {
+      const payload = clonePayload(exported.payload);
+      payload.data.days[0].dayID = "2026-02-31";
+      return payload;
+    })(), "invalid-record"],
+    ["impossible meal date", (() => {
+      const payload = clonePayload(exported.payload);
+      payload.data.meals[0].dayID = "2026-02-31";
+      payload.data.meals[0].id = "2026-02-31:breakfast";
+      return payload;
+    })(), "invalid-record"],
+    ["impossible weight date", (() => {
+      const payload = clonePayload(exported.payload);
+      payload.data.weights[0].dayID = "2026-02-31";
+      return payload;
+    })(), "invalid-record"],
+    ["impossible journal answer date", (() => {
+      const payload = clonePayload(exported.payload);
+      payload.data.journalAnswers[0].dayID = "2026-02-31";
+      payload.data.journalAnswers[0].id = "2026-02-31:journal:baseline-feeling";
+      return payload;
+    })(), "invalid-record"],
     ["bad meal state", (() => {
       const payload = clonePayload(exported.payload);
       payload.data.meals[0].logState = "done";
