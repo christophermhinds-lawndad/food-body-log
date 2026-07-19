@@ -23,6 +23,7 @@ const requiredPublishFiles = [
   "scripts/today-tracking.js",
   "scripts/journal-model.js",
   "scripts/journal-tracking.js",
+  "scripts/history-reports.js",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/apple-touch-icon.png",
