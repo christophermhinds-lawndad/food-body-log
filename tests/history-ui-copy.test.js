@@ -210,7 +210,7 @@ test("history styles extend focus-visible coverage and avoid destructive control
 
 test("reports shell exposes fixed numeric groups and tile template", () => {
   for (const expected of [
-    'class="reports-view"',
+    "reports-view",
     'id="reports-status"',
     'id="weight-reports"',
     'id="meal-reports"',
@@ -227,7 +227,7 @@ test("reports shell exposes fixed numeric groups and tile template", () => {
     assert.match(html, new RegExp(escapeRegExp(expected)), `missing Reports shell artifact ${expected}`);
   }
 
-  assert.equal((reportsPanelHtml().match(/data-report-tile/g) || []).length, 5);
+  assert.equal((reportsPanelHtml().match(/data-report-tile(?:\s|=)/g) || []).length, 5);
   assert.doesNotMatch(reportsPanelHtml(), /<canvas\b|<svg\b|<table\b/i);
 });
 

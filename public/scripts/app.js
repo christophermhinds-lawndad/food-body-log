@@ -8,7 +8,7 @@ import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, s
 import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
 import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=2";
 import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough } from "./journal-tracking.js?v=2";
-import { HISTORY_COPY, getHistoryDay, getHistoryState, saveHistoryDay } from "./history-reports.js?v=1";
+import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=1";
 
 const appPaths = createAppPaths();
 
@@ -41,6 +41,10 @@ const breakthroughList = document.querySelector("#breakthrough-list");
 const breakthroughMessage = document.querySelector("#breakthrough-message");
 const journalPromptTemplate = document.querySelector("[data-journal-prompt-template]");
 const breakthroughTemplate = document.querySelector("[data-breakthrough-template]");
+const reportsStatus = document.querySelector("#reports-status");
+const weightReports = document.querySelector("#weight-reports");
+const mealReports = document.querySelector("#meal-reports");
+const reportTileTemplate = document.querySelector("[data-report-tile-template]");
 const historyStatus = document.querySelector("#history-status");
 const historyList = document.querySelector("#history-list");
 const historyDetail = document.querySelector("#history-detail");
@@ -69,6 +73,7 @@ let planDayID = getTomorrowDayID();
 let journalDayID = todayDayID;
 let historySelectedDayID = "";
 let journalLoadRequestID = 0;
+let reportsLoadRequestID = 0;
 let historyLoadRequestID = 0;
 let historyDayLoadRequestID = 0;
 let currentJournalState = null;
@@ -246,6 +251,10 @@ function selectTab(tabName) {
     loadPlanView();
   }
 
+  if (tabName === "reports") {
+    loadReportsView();
+  }
+
   if (tabName === "journal") {
     loadJournalView();
   }
@@ -366,6 +375,131 @@ async function saveSelectedPlan() {
   if (selectedDayID === todayDayID && result.day.dayID === todayDayID) {
     renderTodayState(result);
   }
+}
+
+async function loadReportsView() {
+  const requestID = reportsLoadRequestID + 1;
+  reportsLoadRequestID = requestID;
+  setText(reportsStatus, REPORTS_COPY.loading);
+  const state = await getReportsState();
+
+  if (requestID !== reportsLoadRequestID) {
+    return;
+  }
+
+  renderReportsState(state);
+}
+
+function renderReportsState(state) {
+  if (!state.available) {
+    setText(reportsStatus, REPORTS_COPY.error);
+    renderWeightReportTiles([]);
+    renderMealReportTiles([]);
+    return;
+  }
+
+  setText(reportsStatus, "");
+  renderWeightReportTiles(state.weightAverages || []);
+  renderMealReportTiles(state.mealMetrics || []);
+}
+
+function renderWeightReportTiles(weightAverages) {
+  for (const windowDays of [7, 30, 90]) {
+    const tile = weightAverages.find((candidate) => candidate.windowDays === windowDays) || {
+      windowDays,
+      periodLabel: `Trailing ${windowDays} days`,
+      state: "NoData",
+      count: 0,
+      average: null,
+      formattedAverage: "",
+    };
+    renderWeightReportTile(tile);
+  }
+}
+
+function renderMealReportTiles(mealMetrics) {
+  for (const metricName of ["ateWhenHungry", "stoppedAtEnough"]) {
+    const tile = mealMetrics.find((candidate) => candidate.metricName === metricName) || {
+      metricName,
+      label: metricName === "stoppedAtEnough" ? REPORTS_COPY.enoughLabel : REPORTS_COPY.hungryLabel,
+      periodLabel: REPORTS_COPY.weightSevenDays,
+      state: "NoData",
+      yesCount: 0,
+      denominator: 0,
+      percentage: null,
+    };
+    renderMealReportTile(tile);
+  }
+}
+
+function renderWeightReportTile(tile) {
+  const card = weightReports?.querySelector(`[data-report-kind="weight"][data-window-days="${tile.windowDays}"]`);
+  renderReportTile(card, {
+    title: tile.periodLabel,
+    label: "Weight average",
+    value: reportValueText(tile),
+    denominator: reportDenominatorText(tile),
+    state: "",
+  });
+}
+
+function renderMealReportTile(tile) {
+  const card = mealReports?.querySelector(`[data-report-kind="meal"][data-metric-name="${tile.metricName}"]`);
+  renderReportTile(card, {
+    title: tile.label,
+    label: tile.periodLabel,
+    value: reportValueText(tile),
+    denominator: reportDenominatorText(tile),
+    state: "",
+  });
+}
+
+function renderReportTile(card, tile) {
+  const target = card || reportTileTemplate?.content?.firstElementChild?.cloneNode(true);
+
+  if (!target) {
+    return;
+  }
+
+  setText(target.querySelector("[data-report-title]"), tile.title);
+  setText(target.querySelector("[data-report-label]"), tile.label);
+  setText(target.querySelector("[data-report-value]"), tile.value);
+  setText(target.querySelector("[data-report-denominator]"), tile.denominator);
+  setText(target.querySelector("[data-report-state]"), tile.state);
+}
+
+function reportValueText(tile) {
+  if (Object.hasOwn(tile, "average")) {
+    return tile.state === "Ready" ? (tile.formattedAverage || String(tile.average)) : REPORTS_COPY.weightNoData;
+  }
+
+  if (tile.state === "Ready") {
+    return `${tile.percentage}%`;
+  }
+
+  if (tile.state === "Insufficient") {
+    return REPORTS_COPY.mealInsufficient;
+  }
+
+  return REPORTS_COPY.mealNoData;
+}
+
+function reportDenominatorText(tile) {
+  if (Object.hasOwn(tile, "average")) {
+    const count = Number(tile.count || 0);
+    const noun = count === 1 ? "entry" : "entries";
+    return REPORTS_COPY.weightDenominator.replace("{count}", String(count)).replace("entry/entries", noun);
+  }
+
+  const denominator = Number(tile.denominator || 0);
+
+  if (tile.state === "Ready") {
+    return REPORTS_COPY.mealDenominator
+      .replace("{yesCount}", String(tile.yesCount || 0))
+      .replace("{denominator}", String(denominator));
+  }
+
+  return denominator === 1 ? "1 logged non-skipped meal in this period." : `${denominator} logged non-skipped meals in this period.`;
 }
 
 async function loadJournalView() {

@@ -111,7 +111,7 @@ test("reports shell exposes fixed numeric summary containers", () => {
   assert.match(html, /Weight averages/);
   assert.match(html, /Meal metrics/);
   assert.match(html, /Numeric summaries use only saved local entries/);
-  assert.equal((html.match(/data-report-tile/g) || []).length, 5);
+  assert.equal((html.match(/data-report-tile(?:\s|=)/g) || []).length, 5);
 });
 
 test("journal styling uses compact mobile-safe cards chips and actions", () => {

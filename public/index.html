@@ -186,9 +186,66 @@
           </form>
         </section>
 
-        <section class="view-panel" data-view="reports" hidden>
-          <h2>Reports</h2>
-          <p>Numeric summaries arrive after daily entries exist.</p>
+        <section class="view-panel reports-view" data-view="reports" hidden>
+          <div>
+            <h2>Reports</h2>
+            <p class="note">Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.</p>
+          </div>
+          <p id="reports-status" class="status-message" aria-live="polite">Loading reports...</p>
+          <section class="reports-section" aria-labelledby="weight-reports-title">
+            <h2 id="weight-reports-title">Weight averages</h2>
+            <div id="weight-reports" class="reports-grid" aria-live="polite">
+              <article class="report-card" data-report-tile data-report-kind="weight" data-window-days="7">
+                <h3 data-report-title>Trailing 7 days</h3>
+                <p class="report-label" data-report-label>Weight average</p>
+                <p class="report-value" data-report-value>No weight data for this period.</p>
+                <p class="report-denominator" data-report-denominator>Based on 0 weight entries in this period.</p>
+                <p class="report-state" data-report-state></p>
+              </article>
+              <article class="report-card" data-report-tile data-report-kind="weight" data-window-days="30">
+                <h3 data-report-title>Trailing 30 days</h3>
+                <p class="report-label" data-report-label>Weight average</p>
+                <p class="report-value" data-report-value>No weight data for this period.</p>
+                <p class="report-denominator" data-report-denominator>Based on 0 weight entries in this period.</p>
+                <p class="report-state" data-report-state></p>
+              </article>
+              <article class="report-card" data-report-tile data-report-kind="weight" data-window-days="90">
+                <h3 data-report-title>Trailing 90 days</h3>
+                <p class="report-label" data-report-label>Weight average</p>
+                <p class="report-value" data-report-value>No weight data for this period.</p>
+                <p class="report-denominator" data-report-denominator>Based on 0 weight entries in this period.</p>
+                <p class="report-state" data-report-state></p>
+              </article>
+            </div>
+          </section>
+          <section class="reports-section" aria-labelledby="meal-reports-title">
+            <h2 id="meal-reports-title">Meal metrics</h2>
+            <div id="meal-reports" class="reports-grid" aria-live="polite">
+              <article class="report-card" data-report-tile data-report-kind="meal" data-metric-name="ateWhenHungry">
+                <h3 data-report-title>Ate when hungry</h3>
+                <p class="report-label" data-report-label>Trailing 7 days</p>
+                <p class="report-value" data-report-value>No logged meals for this period.</p>
+                <p class="report-denominator" data-report-denominator>0 logged non-skipped meals in this period.</p>
+                <p class="report-state" data-report-state></p>
+              </article>
+              <article class="report-card" data-report-tile data-report-kind="meal" data-metric-name="stoppedAtEnough">
+                <h3 data-report-title>Stopped at enough</h3>
+                <p class="report-label" data-report-label>Trailing 7 days</p>
+                <p class="report-value" data-report-value>No logged meals for this period.</p>
+                <p class="report-denominator" data-report-denominator>0 logged non-skipped meals in this period.</p>
+                <p class="report-state" data-report-state></p>
+              </article>
+            </div>
+          </section>
+          <template data-report-tile-template>
+            <article class="report-card">
+              <h3 data-report-title></h3>
+              <p class="report-label" data-report-label></p>
+              <p class="report-value" data-report-value></p>
+              <p class="report-denominator" data-report-denominator></p>
+              <p class="report-state" data-report-state></p>
+            </article>
+          </template>
         </section>
 
         <section class="view-panel journal-view" data-view="journal" hidden>
