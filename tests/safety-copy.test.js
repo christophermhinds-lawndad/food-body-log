@@ -8,6 +8,7 @@ const html = await readRuntimeFile("public/index.html");
 const appSource = await readRuntimeFile("public/scripts/app.js");
 const historyReportsSource = await readRuntimeFile("public/scripts/history-reports.js");
 const normalizedRuntimeCopy = normalizeCopy(extractRuntimeCopy(runtimeFiles));
+const phaseSixUatPath = new URL("../.planning/phases/06-data-safety-and-experience-hardening/06-UAT.md", import.meta.url);
 
 const forbiddenVisibleCopy = [
   "calories",
@@ -146,6 +147,39 @@ test("runtime statuses expose visible text or marker plus text instead of color 
   assert.match(html, /aria-label="Editable or Read-only"/);
   assert.match(appSource, /setText\(reportNode\.querySelector\("\[data-report-value\]"\), tile\.value\)/);
   assert.match(appSource, /setText\(importBackupStatus,/);
+});
+
+test("phase 6 UAT requires full suite before local and manual checks", async () => {
+  const uat = await readFile(phaseSixUatPath, "utf8");
+  const normalized = normalizeCopy(uat);
+
+  assert.ok(normalized.includes("node --test tests/*.test.js"), "missing full-suite prerequisite");
+  assert.ok(normalized.includes("export download"), "missing export download check");
+  assert.ok(normalized.includes("valid import replace"), "missing valid import replace check");
+  assert.ok(normalized.includes("invalid import no-write"), "missing invalid import no-write check");
+  assert.ok(normalized.includes("settings storage warning"), "missing Settings storage warning check");
+  assert.ok(normalized.includes("long filename wrapping"), "missing long filename wrapping check");
+  assert.ok(normalized.includes("whole-app primary-flow fit"), "missing whole-app primary-flow fit check");
+});
+
+test("phase 6 UAT keeps unavailable target device evidence human-needed", async () => {
+  const uat = await readFile(phaseSixUatPath, "utf8");
+  const normalized = normalizeCopy(uat);
+
+  for (const requiredEvidence of [
+    "physical iphone 13",
+    "hosted https url",
+    "home screen install",
+    "installed offline relaunch",
+  ]) {
+    assert.ok(normalized.includes(requiredEvidence), `missing target evidence row: ${requiredEvidence}`);
+  }
+
+  assert.ok(normalized.includes("human-needed"), "target evidence must stay human-needed without real evidence");
+  assert.doesNotMatch(normalized, /physical iphone 13[\s\S]{0,120}\b(pass|passed|complete|verified)\b/);
+  assert.doesNotMatch(normalized, /hosted https url[\s\S]{0,120}\b(pass|passed|complete|verified)\b/);
+  assert.doesNotMatch(normalized, /home screen install[\s\S]{0,120}\b(pass|passed|complete|verified)\b/);
+  assert.doesNotMatch(normalized, /installed offline relaunch[\s\S]{0,120}\b(pass|passed|complete|verified)\b/);
 });
 
 async function loadRuntimeFiles() {

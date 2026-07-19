@@ -5,6 +5,7 @@ import test from "node:test";
 import { CURRENT_CACHE_NAME, EXPECTED_SHELL_ASSETS, getCacheReadinessStatus } from "../public/scripts/install-status.js";
 
 const swSource = await readFile(new URL("../public/sw.js", import.meta.url), "utf8");
+const phaseSixUatPath = new URL("../.planning/phases/06-data-safety-and-experience-hardening/06-UAT.md", import.meta.url);
 
 const requiredShellAssets = [
   "./",
@@ -106,6 +107,22 @@ test("service worker limits shell cache writes to app shell assets and navigatio
   assert.match(swSource, /!isShellAsset && event\.request\.mode !== "navigate"/);
   assert.match(swSource, /fetchAndRefreshShellCache\(event\.request,\s*\{\s*cacheRequest: isShellAsset,?\s*\}\)/s);
   assert.match(swSource, /if \(cacheRequest && response\.ok\) \{/);
+});
+
+test("phase 6 UAT does not claim automated evidence for target install and offline checks", async () => {
+  const uat = await readFile(phaseSixUatPath, "utf8");
+  const normalized = uat.toLowerCase().replace(/\s+/g, " ");
+
+  for (const row of [
+    "physical iphone 13",
+    "hosted https url",
+    "home screen install",
+    "installed offline relaunch",
+  ]) {
+    assert.match(normalized, new RegExp(`${escapeRegExp(row)}[^|\\n]*\\|\\s*human-needed`), `${row} must be human-needed`);
+  }
+
+  assert.doesNotMatch(normalized, /\b(target-device|iphone 13|hosted https|home screen|offline relaunch)\b[^.\n]*(automated pass|auto-pass|verified by tests|passed by tests)/);
 });
 
 function createFakeCaches(scope, cachedAssets) {
