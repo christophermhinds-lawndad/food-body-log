@@ -109,6 +109,59 @@ test("safe DOM helper writes textContent and exposes no raw HTML insertion API",
   assert.equal("renderHtml" in dom, false);
 });
 
+test("backup controller imports portability helpers and queries settings controls once", () => {
+  assert.match(
+    appSource,
+    /import \{ createDownloadSpec, exportLocalData, parseBackupText, replaceLocalDataFromBackup \} from "\.\/data-portability\.js\?v=1";/,
+  );
+
+  for (const selector of [
+    "#export-backup",
+    "#export-backup-status",
+    "#backup-file-input",
+    "#backup-selected-file",
+    "#replace-local-data",
+    "#import-backup-status",
+  ]) {
+    assert.match(appSource, new RegExp(`document\\.querySelector\\("${escapeRegExp(selector)}"\\)`), `missing query for ${selector}`);
+  }
+});
+
+test("backup controller uses safe text sinks for every filename and status message", () => {
+  for (const nodeName of [
+    "exportBackupStatus",
+    "backupSelectedFile",
+    "importBackupStatus",
+    "replaceBackupButton",
+  ]) {
+    assert.match(appSource, new RegExp(`setText\\(${nodeName},`), `missing setText use for ${nodeName}`);
+  }
+
+  assert.doesNotMatch(appSource, /exportBackupStatus\.textContent|backupSelectedFile\.textContent|importBackupStatus\.textContent|replaceBackupButton\.textContent/);
+  assert.doesNotMatch(appSource, /\.innerHTML\s*=|insertAdjacentHTML|outerHTML|createContextualFragment/);
+});
+
+test("backup import controller validates before replace and guards stale file selections", () => {
+  assert.match(appSource, /let backupSelectionRequestID = 0;/);
+  assert.match(appSource, /let readyBackupPayload = null;/);
+  assert.match(appSource, /backupSelectionRequestID \+= 1;/);
+  assert.match(appSource, /const requestID = backupSelectionRequestID;/);
+  assert.match(appSource, /if \(requestID !== backupSelectionRequestID\) \{/);
+  assert.match(appSource, /parseBackupText\(text\)/);
+  assert.match(appSource, /readyBackupPayload = parsed\.payload;/);
+  assert.match(appSource, /replaceBackupButton\.disabled = !readyBackupPayload;/);
+});
+
+test("backup replace action is confirmation gated and invalid paths do not call writer", () => {
+  assert.match(appSource, /window\.confirm\(\`${BACKUP_UI_COPY\.confirmTitle}\\n\\n\${BACKUP_UI_COPY\.confirmBody}`\)/);
+  assert.match(appSource, /replaceLocalDataFromBackup\(readyBackupPayload\)/);
+  assert.match(appSource, /Nothing was imported, and the local data already on this device was not changed\./);
+
+  const validationHandler = appSource.match(/async function validateSelectedBackup\(\)[\s\S]*?\n}\n\n/)?.[0] || "";
+  assert.match(validationHandler, /parseBackupText\(text\)/);
+  assert.doesNotMatch(validationHandler, /replaceLocalDataFromBackup/);
+});
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
