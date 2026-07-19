@@ -24,11 +24,18 @@ Use this checklist during `$gsd-verify-work` to validate the final Phase 6 backu
 - Expected: the browser offers or creates a Food Body Log JSON backup file; Settings shows `Backup exported. Keep the file somewhere you can find it later.` Saved local data remains available in the app.
 - Result status: pending manual verification.
 
-### Valid Import Replace
+### Valid Import Merge
 
 - Setup: keep a known exported Food Body Log JSON backup from the same test origin or a disposable fixture. Export current local data first if it needs to be preserved.
-- Steps: open Settings, choose the valid JSON backup, confirm `Replace local data?`, then reopen Today, Plan, Journal, History, and Reports.
-- Expected: validation shows `Backup looks ready to import. Review the confirmation before replacing local data.` The replace confirmation states that current local data will be replaced and recommends exporting first. After confirmation, restored records appear in the relevant tabs.
+- Steps: open Settings, choose the valid JSON backup with dates that do not overlap local data, select `Import backup`, then reopen Today, Plan, Journal, History, and Reports.
+- Expected: validation shows `Backup looks ready to import. Non-overlapping dates will be added to local data.` Existing local dates remain saved, and imported records appear in the relevant tabs.
+- Result status: pending manual verification.
+
+### Valid Import Overlap Confirmation
+
+- Setup: keep a known exported Food Body Log JSON backup whose dates overlap at least one local date on the test origin. Export current local data first if it needs to be preserved.
+- Steps: open Settings and choose the valid JSON backup.
+- Expected: Settings shows `Backup has dates that overlap local data. Check the overwrite box before importing.`, lists the number of overlapping days, shows the overlap checkbox, and keeps `Import backup` unavailable until the checkbox is checked. After checking the box and importing, overlapping dates are replaced by the backup while non-overlapping local dates stay saved.
 - Result status: pending manual verification.
 
 ### Invalid Import No-Write

@@ -804,6 +804,41 @@ p {
   overflow-wrap: anywhere;
 }
 
+.backup-overlap-warning {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--destructive);
+  border-radius: 8px;
+  background: #F8EDEA;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.backup-overlap-warning p {
+  margin: 0;
+}
+
+.checkbox-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.checkbox-row input {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--destructive);
+}
+
 .backup-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

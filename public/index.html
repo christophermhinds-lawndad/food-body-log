@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
     <link rel="stylesheet" href="./styles/app.css">
-    <script type="module" src="./scripts/app.js?v=8"></script>
+    <script type="module" src="./scripts/app.js?v=9"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -398,11 +398,9 @@
             data-export-error-copy="Backup could not be exported. Reopen the app and try again. Data already saved on this device stays local."
             data-file-selected-copy="Backup selected:"
             data-import-checking-copy="Checking backup..."
-            data-import-ready-copy="Backup looks ready to import. Review the confirmation before replacing local data."
-            data-import-ready-action-copy="Replace local data"
-            data-import-confirm-title="Replace local data?"
-            data-import-confirm-body="This will replace the local data currently saved on this device with the selected backup. Export a backup first if you want a copy of what is here now."
-            data-import-success-copy="Backup imported. Reopen each tab to see restored local data."
+            data-import-ready-copy="Backup looks ready to import. Non-overlapping dates will be added to local data."
+            data-import-ready-action-copy="Import backup"
+            data-import-success-copy="Backup imported. Reopen each tab to see updated local data."
             data-import-invalid-copy="Backup could not be read. Choose a Food Body Log JSON backup exported from this app."
             data-import-unsupported-copy="This backup format is not supported by this version of Food Body Log."
             data-import-missing-store-copy="This backup is missing required local data sections, so nothing was imported."
@@ -424,10 +422,18 @@
 
               <section class="backup-file-control" aria-labelledby="import-backup-title">
                 <h3 id="import-backup-title">Import backup</h3>
-                <p class="note">Import replaces local data on this device after confirmation. Export first if you want to keep a copy of the current local data.</p>
+                <p class="note">Import adds non-overlapping dates to this device. If backup dates overlap with local dates, only those dates can be overwritten after confirmation.</p>
                 <label class="field-label" for="backup-file-input">Choose backup file</label>
                 <input id="backup-file-input" class="text-field" type="file" accept=".json,application/json">
                 <p id="backup-selected-file" class="status-message backup-selected-file" aria-live="polite">No backup selected</p>
+                <div id="backup-overlap-warning" class="backup-overlap-warning" hidden>
+                  <strong>Overlapping local dates found</strong>
+                  <p id="backup-overlap-count">0 overlapping days found.</p>
+                  <label class="checkbox-row" for="confirm-overlap-import">
+                    <input id="confirm-overlap-import" type="checkbox">
+                    <span>Overwrite overlapping dates from this backup. Local dates that do not overlap will stay saved.</span>
+                  </label>
+                </div>
                 <button id="replace-local-data" class="secondary-action" type="button" disabled>Choose a backup first</button>
                 <p id="import-backup-status" class="status-message backup-status" aria-live="polite">Choose a Food Body Log JSON backup when you want to restore saved local data.</p>
               </section>

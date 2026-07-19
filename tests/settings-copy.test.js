@@ -42,16 +42,18 @@ test("settings backup copy exposes export import warnings and confirmation langu
     "Backup could not be exported. Reopen the app and try again. Data already saved on this device stays local.",
     "Import backup",
     "Choose backup file",
-    "Import replaces local data on this device after confirmation. Export first if you want to keep a copy of the current local data.",
+    "Import adds non-overlapping dates to this device. If backup dates overlap with local dates, only those dates can be overwritten after confirmation.",
     "No backup selected",
     "Backup selected:",
     "Checking backup...",
-    "Backup looks ready to import. Review the confirmation before replacing local data.",
+    "Backup looks ready to import. Non-overlapping dates will be added to local data.",
+    "Backup has dates that overlap local data. Check the overwrite box before importing.",
     "Choose a backup first",
-    "Replace local data?",
-    "This will replace the local data currently saved on this device with the selected backup. Export a backup first if you want a copy of what is here now.",
-    "Replace local data",
-    "Backup imported. Reopen each tab to see restored local data.",
+    "Import backup",
+    "Backup imported. Reopen each tab to see updated local data.",
+    "Overlapping local dates found",
+    "Overwrite overlapping dates from this backup. Local dates that do not overlap will stay saved.",
+    "Overlapping dates require confirmation before anything is imported.",
     "Backup could not be read. Choose a Food Body Log JSON backup exported from this app.",
     "This backup format is not supported by this version of Food Body Log.",
     "This backup is missing required local data sections, so nothing was imported.",
@@ -79,6 +81,9 @@ test("settings markup exposes native backup controls and polite status regions",
   assert.match(html, /<label[^>]+class="field-label"[^>]+for="backup-file-input"[^>]*>Choose backup file<\/label>/);
   assert.match(html, /<input[^>]+id="backup-file-input"[^>]+type="file"[^>]+accept="\.json,application\/json"/);
   assert.match(html, /id="backup-selected-file" class="status-message backup-selected-file" aria-live="polite"/);
+  assert.match(html, /<div[^>]+id="backup-overlap-warning"[^>]+class="backup-overlap-warning"[^>]+hidden/);
+  assert.match(html, /<p[^>]+id="backup-overlap-count"[^>]*>0 overlapping days found\.<\/p>/);
+  assert.match(html, /<input[^>]+id="confirm-overlap-import"[^>]+type="checkbox"/);
   assert.match(html, /id="import-backup-status" class="status-message backup-status" aria-live="polite"/);
   assert.match(html, /<button[^>]+id="replace-local-data"[^>]+class="secondary-action"[^>]+type="button"[^>]+disabled[^>]*>Choose a backup first<\/button>/);
 });
@@ -119,7 +124,7 @@ test("safe DOM helper writes textContent and exposes no raw HTML insertion API",
 test("backup controller imports portability helpers and queries settings controls once", () => {
   assert.match(
     appSource,
-    /import \{ createDownloadSpec, exportLocalData, parseBackupText, replaceLocalDataFromBackup \} from "\.\/data-portability\.js\?v=2";/,
+    /import \{ createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText \} from "\.\/data-portability\.js\?v=3";/,
   );
 
   for (const selector of [
@@ -129,6 +134,9 @@ test("backup controller imports portability helpers and queries settings control
     "#backup-selected-file",
     "#replace-local-data",
     "#import-backup-status",
+    "#backup-overlap-warning",
+    "#backup-overlap-count",
+    "#confirm-overlap-import",
   ]) {
     assert.match(appSource, new RegExp(`document\\.querySelector\\("${escapeRegExp(selector)}"\\)`), `missing query for ${selector}`);
   }
@@ -140,33 +148,42 @@ test("backup controller uses safe text sinks for every filename and status messa
     "backupSelectedFile",
     "importBackupStatus",
     "replaceBackupButton",
+    "backupOverlapCount",
   ]) {
     assert.match(appSource, new RegExp(`setText\\(${nodeName},`), `missing setText use for ${nodeName}`);
   }
 
-  assert.doesNotMatch(appSource, /exportBackupStatus\.textContent|backupSelectedFile\.textContent|importBackupStatus\.textContent|replaceBackupButton\.textContent/);
+  assert.doesNotMatch(appSource, /exportBackupStatus\.textContent|backupSelectedFile\.textContent|importBackupStatus\.textContent|replaceBackupButton\.textContent|backupOverlapCount\.textContent/);
   assert.doesNotMatch(appSource, /\.innerHTML\s*=|insertAdjacentHTML|outerHTML|createContextualFragment/);
 });
 
-test("backup import controller validates before replace and guards stale file selections", () => {
+test("backup import controller validates before merge and guards stale file selections", () => {
   assert.match(appSource, /let backupSelectionRequestID = 0;/);
   assert.match(appSource, /let readyBackupPayload = null;/);
+  assert.match(appSource, /let readyBackupOverlapDayCount = 0;/);
   assert.match(appSource, /backupSelectionRequestID \+= 1;/);
   assert.match(appSource, /const requestID = backupSelectionRequestID;/);
   assert.match(appSource, /if \(requestID !== backupSelectionRequestID\) \{/);
   assert.match(appSource, /parseBackupText\(text\)/);
-  assert.match(appSource, /readyBackupPayload = parsed\.payload;/);
-  assert.match(appSource, /replaceBackupButton\.disabled = !readyBackupPayload;/);
+  assert.match(appSource, /inspectBackupImport\(parsed\.payload\)/);
+  assert.match(appSource, /readyBackupPayload = inspection\.payload;/);
+  assert.match(appSource, /readyBackupOverlapDayCount = inspection\.overlapDayCount \|\| 0;/);
+  assert.match(appSource, /const needsOverlapConfirmation = readyBackupOverlapDayCount > 0 && !confirmOverlapImport\?\.checked;/);
+  assert.match(appSource, /replaceBackupButton\.disabled = !readyBackupPayload \|\| needsOverlapConfirmation;/);
 });
 
-test("backup replace action is confirmation gated and invalid paths do not call writer", () => {
-  assert.match(appSource, /window\.confirm\(`\$\{BACKUP_UI_COPY\.confirmTitle\}\\n\\n\$\{BACKUP_UI_COPY\.confirmBody\}`\)/);
-  assert.match(appSource, /replaceLocalDataFromBackup\(readyBackupPayload\)/);
+test("backup import action is overlap-checkbox gated and invalid paths do not call writer", () => {
+  const importHandler = appSource.match(/async function replaceFromSelectedBackup\(\)[\s\S]*?\n}\n\nfunction triggerBackupDownload/)?.[0] || "";
+
+  assert.match(importHandler, /readyBackupOverlapDayCount > 0 && !allowOverwrite/);
+  assert.match(importHandler, /importLocalDataFromBackup\(readyBackupPayload, \{ allowOverwrite \}\)/);
   assert.match(appSource, /Nothing was imported, and the local data already on this device was not changed\./);
+  assert.doesNotMatch(importHandler, /window\.confirm/);
+  assert.doesNotMatch(importHandler, /replaceLocalDataFromBackup\(readyBackupPayload\)/);
 
   const validationHandler = appSource.match(/async function validateSelectedBackup\(\)[\s\S]*?\n}\n\n/)?.[0] || "";
   assert.match(validationHandler, /parseBackupText\(text\)/);
-  assert.doesNotMatch(validationHandler, /replaceLocalDataFromBackup/);
+  assert.doesNotMatch(validationHandler, /importLocalDataFromBackup/);
 });
 
 function escapeRegExp(value) {

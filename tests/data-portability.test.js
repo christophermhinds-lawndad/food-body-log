@@ -53,6 +53,17 @@ class FakeObjectStore {
     return requestThatSucceeds(key);
   }
 
+  delete(key) {
+    if (this.transaction?.mode === "readwrite") {
+      this.transaction.stageDelete(this.store, key);
+    } else {
+      this.store.records.delete(key);
+    }
+
+    this.transaction?.queueCompletion();
+    return requestThatSucceeds(undefined);
+  }
+
   getAll() {
     return requestThatSucceeds(Array.from(this.store.records.values()).map((record) => structuredClone(record)));
   }
@@ -98,6 +109,10 @@ class FakeTransaction {
     this.pendingOps.push({ type: "put", store, key, value: structuredClone(value) });
   }
 
+  stageDelete(store, key) {
+    this.pendingOps.push({ type: "delete", store, key });
+  }
+
   fail(error) {
     this.failed = true;
     this.error = error;
@@ -121,6 +136,8 @@ class FakeTransaction {
         for (const op of this.pendingOps) {
           if (op.type === "clear") {
             op.store.records.clear();
+          } else if (op.type === "delete") {
+            op.store.records.delete(op.key);
           } else {
             op.store.records.set(op.key, structuredClone(op.value));
           }
@@ -373,6 +390,109 @@ test("replaceLocalDataFromBackup clears prior records and restores exported data
   assert.deepEqual(snapshotStores(second.db).journalAnswers.records, keyBy(expected.data.journalAnswers, "id"));
   assert.equal(readwriteTransactions.length, 1);
   assert.deepEqual(readwriteTransactions[0].names, STORE_NAMES);
+});
+
+test("importLocalDataFromBackup adds non-overlapping backup days without replacing local data", async () => {
+  const source = await loadModules("merge-source");
+  seedPortableRecords(source.db);
+  const exported = await source.dataPortability.exportLocalData({ now: FIXED_NOW });
+
+  const target = await loadModules("merge-target");
+  seedRecord(target.db, "days", {
+    dayID: "2026-07-01",
+    createdAt: "2026-07-01T08:00:00.000Z",
+    updatedAt: "2026-07-01T08:00:00.000Z",
+  });
+  seedRecord(target.db, "weights", { dayID: "2026-07-01", value: 199 });
+  const original = snapshotStores(target.db);
+
+  const inspection = await target.dataPortability.inspectBackupImport(exported.payload);
+  const result = await target.dataPortability.importLocalDataFromBackup(exported.payload);
+  const snapshot = snapshotStores(target.db);
+
+  assert.equal(inspection.status, "Ready");
+  assert.equal(inspection.overlapDayCount, 0);
+  assert.deepEqual(inspection.overlapDayIDs, []);
+  assert.equal(result.status, "Ready");
+  assert.equal(result.overlapDayCount, 0);
+  assert.deepEqual(snapshot.days.records["2026-07-01"], original.days.records["2026-07-01"]);
+  assert.deepEqual(snapshot.weights.records["2026-07-01"], original.weights.records["2026-07-01"]);
+  assert.deepEqual(snapshot.days.records["2026-07-17"], exported.payload.data.days[0]);
+  assert.deepEqual(snapshot.meals.records["2026-07-17:breakfast"], exported.payload.data.meals[0]);
+  assert.deepEqual(snapshot.weights.records["2026-07-17"], exported.payload.data.weights[0]);
+  assert.deepEqual(snapshot.journalAnswers.records["2026-07-17:journal:baseline-feeling"], exported.payload.data.journalAnswers[0]);
+});
+
+test("importLocalDataFromBackup blocks overlapping days until overwrite is confirmed", async () => {
+  const source = await loadModules("overlap-source");
+  seedPortableRecords(source.db);
+  const exported = await source.dataPortability.exportLocalData({ now: FIXED_NOW });
+
+  const target = await loadModules("overlap-target");
+  seedPortableRecords(target.db);
+  seedRecord(target.db, "meals", {
+    id: "2026-07-17:lunch",
+    dayID: "2026-07-17",
+    slot: "lunch",
+    slotLabel: "Lunch",
+    plannedText: "Local lunch only",
+    logState: "notLogged",
+    ateWhenHungry: "unanswered",
+    stoppedAtEnough: "unanswered",
+    loggedAt: null,
+  });
+  const original = snapshotStores(target.db);
+
+  const result = await target.dataPortability.importLocalDataFromBackup(exported.payload);
+
+  assert.equal(result.status, "NeedsOverlapConfirmation");
+  assert.equal(result.error.code, "overlapping-days");
+  assert.equal(result.overlapDayCount, 1);
+  assert.deepEqual(result.overlapDayIDs, ["2026-07-17"]);
+  assert.deepEqual(snapshotStores(target.db), original);
+});
+
+test("importLocalDataFromBackup replaces only confirmed overlapping days", async () => {
+  const source = await loadModules("overwrite-source");
+  seedPortableRecords(source.db);
+  const exported = await source.dataPortability.exportLocalData({ now: FIXED_NOW });
+
+  const target = await loadModules("overwrite-target");
+  seedRecord(target.db, "days", {
+    dayID: "2026-07-01",
+    createdAt: "2026-07-01T08:00:00.000Z",
+    updatedAt: "2026-07-01T08:00:00.000Z",
+  });
+  seedRecord(target.db, "weights", { dayID: "2026-07-01", value: 199 });
+  seedPortableRecords(target.db);
+  seedRecord(target.db, "meals", {
+    id: "2026-07-17:lunch",
+    dayID: "2026-07-17",
+    slot: "lunch",
+    slotLabel: "Lunch",
+    plannedText: "Local lunch only",
+    logState: "notLogged",
+    ateWhenHungry: "unanswered",
+    stoppedAtEnough: "unanswered",
+    loggedAt: null,
+  });
+
+  const result = await target.dataPortability.importLocalDataFromBackup(exported.payload, { allowOverwrite: true });
+  const snapshot = snapshotStores(target.db);
+
+  assert.equal(result.status, "Ready");
+  assert.equal(result.overlapDayCount, 1);
+  assert.deepEqual(result.overlapDayIDs, ["2026-07-17"]);
+  assert.deepEqual(snapshot.days.records["2026-07-01"], {
+    dayID: "2026-07-01",
+    createdAt: "2026-07-01T08:00:00.000Z",
+    updatedAt: "2026-07-01T08:00:00.000Z",
+  });
+  assert.deepEqual(snapshot.weights.records["2026-07-01"], { dayID: "2026-07-01", value: 199 });
+  assert.deepEqual(snapshot.days.records["2026-07-17"], exported.payload.data.days[0]);
+  assert.deepEqual(snapshot.meals.records, keyBy(exported.payload.data.meals, "id"));
+  assert.deepEqual(snapshot.weights.records["2026-07-17"], exported.payload.data.weights[0]);
+  assert.deepEqual(snapshot.journalAnswers.records, keyBy(exported.payload.data.journalAnswers, "id"));
 });
 
 test("invalid backups are rejected before any write transaction opens", async () => {

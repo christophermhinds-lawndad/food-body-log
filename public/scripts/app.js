@@ -1,7 +1,7 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=8";
+import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=9";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
 import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=4";
@@ -9,7 +9,7 @@ import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
 import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=2";
 import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough } from "./journal-tracking.js?v=2";
 import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=1";
-import { createDownloadSpec, exportLocalData, parseBackupText, replaceLocalDataFromBackup } from "./data-portability.js?v=2";
+import { createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText } from "./data-portability.js?v=3";
 
 const appPaths = createAppPaths();
 
@@ -70,6 +70,9 @@ const backupFileInput = document.querySelector("#backup-file-input");
 const backupSelectedFile = document.querySelector("#backup-selected-file");
 const replaceBackupButton = document.querySelector("#replace-local-data");
 const importBackupStatus = document.querySelector("#import-backup-status");
+const backupOverlapWarning = document.querySelector("#backup-overlap-warning");
+const backupOverlapCount = document.querySelector("#backup-overlap-count");
+const confirmOverlapImport = document.querySelector("#confirm-overlap-import");
 const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded. You can keep typing.";
 const JOURNAL_LOAD_MESSAGE = "Loading evening reflection...";
 const JOURNAL_UNAVAILABLE_MESSAGE = "Evening reflection could not be loaded. Reopen the app and try again.";
@@ -85,16 +88,16 @@ const BACKUP_UI_COPY = Object.freeze({
   noFile: "No backup selected",
   fileSelectedPrefix: "Backup selected:",
   checking: "Checking backup...",
-  ready: "Backup looks ready to import. Review the confirmation before replacing local data.",
+  ready: "Backup looks ready to import. Non-overlapping dates will be added to local data.",
+  readyWithOverlap: "Backup has dates that overlap local data. Check the overwrite box before importing.",
   chooseFirst: "Choose a backup first",
-  confirmTitle: "Replace local data?",
-  confirmBody: "This will replace the local data currently saved on this device with the selected backup. Export a backup first if you want a copy of what is here now.",
-  replaceAction: "Replace local data",
-  imported: "Backup imported. Reopen each tab to see restored local data.",
+  replaceAction: "Import backup",
+  imported: "Backup imported. Reopen each tab to see updated local data.",
   invalid: "Backup could not be read. Choose a Food Body Log JSON backup exported from this app.",
   unsupported: "This backup format is not supported by this version of Food Body Log.",
   missingStore: "This backup is missing required local data sections, so nothing was imported.",
   oversized: "This file is larger than this version can import. Choose a smaller Food Body Log backup.",
+  overlapBlocked: "Overlapping dates require confirmation before anything is imported.",
   noWrite: "Nothing was imported, and the local data already on this device was not changed.",
 });
 let todayDayID = getTodayDayID();
@@ -107,6 +110,7 @@ let historyLoadRequestID = 0;
 let historyDayLoadRequestID = 0;
 let backupSelectionRequestID = 0;
 let readyBackupPayload = null;
+let readyBackupOverlapDayCount = 0;
 let currentJournalState = null;
 let currentHistoryDayState = null;
 let pendingWeightConfirmation = null;
@@ -139,6 +143,10 @@ backupFileInput?.addEventListener("change", () => {
 
 replaceBackupButton?.addEventListener("click", () => {
   replaceFromSelectedBackup();
+});
+
+confirmOverlapImport?.addEventListener("change", () => {
+  updateReplaceBackupAction();
 });
 
 weightForm?.addEventListener("submit", (event) => {
@@ -386,6 +394,8 @@ async function validateSelectedBackup() {
   const requestID = backupSelectionRequestID;
   const file = backupFileInput?.files?.[0] || null;
   readyBackupPayload = null;
+  readyBackupOverlapDayCount = 0;
+  updateBackupOverlapWarning();
   updateReplaceBackupAction();
 
   if (!file) {
@@ -422,8 +432,22 @@ async function validateSelectedBackup() {
       return;
     }
 
-    readyBackupPayload = parsed.payload;
-    setText(importBackupStatus, BACKUP_UI_COPY.ready);
+    const inspection = await inspectBackupImport(parsed.payload);
+
+    if (requestID !== backupSelectionRequestID) {
+      return;
+    }
+
+    if (inspection.status !== "Ready") {
+      setText(importBackupStatus, backupImportStatusText(inspection));
+      updateReplaceBackupAction();
+      return;
+    }
+
+    readyBackupPayload = inspection.payload;
+    readyBackupOverlapDayCount = inspection.overlapDayCount || 0;
+    updateBackupOverlapWarning();
+    setText(importBackupStatus, readyBackupOverlapDayCount > 0 ? BACKUP_UI_COPY.readyWithOverlap : BACKUP_UI_COPY.ready);
     updateReplaceBackupAction();
   } catch {
     if (requestID !== backupSelectionRequestID) {
@@ -442,15 +466,18 @@ async function replaceFromSelectedBackup() {
     return;
   }
 
-  if (!window.confirm(`${BACKUP_UI_COPY.confirmTitle}\n\n${BACKUP_UI_COPY.confirmBody}`)) {
-    setText(importBackupStatus, BACKUP_UI_COPY.ready);
+  const allowOverwrite = Boolean(confirmOverlapImport?.checked);
+
+  if (readyBackupOverlapDayCount > 0 && !allowOverwrite) {
+    setText(importBackupStatus, `${BACKUP_UI_COPY.overlapBlocked} ${BACKUP_UI_COPY.noWrite}`);
+    updateReplaceBackupAction();
     return;
   }
 
-  setText(importBackupStatus, "Replacing local data...");
+  setText(importBackupStatus, "Importing backup...");
   replaceBackupButton.disabled = true;
 
-  const result = await replaceLocalDataFromBackup(readyBackupPayload);
+  const result = await importLocalDataFromBackup(readyBackupPayload, { allowOverwrite });
 
   if (result.status !== "Ready") {
     setText(importBackupStatus, backupImportStatusText(result));
@@ -459,9 +486,14 @@ async function replaceFromSelectedBackup() {
   }
 
   readyBackupPayload = null;
+  readyBackupOverlapDayCount = 0;
   if (backupFileInput) {
     backupFileInput.value = "";
   }
+  if (confirmOverlapImport) {
+    confirmOverlapImport.checked = false;
+  }
+  updateBackupOverlapWarning();
   setText(backupSelectedFile, BACKUP_UI_COPY.noFile);
   setText(importBackupStatus, BACKUP_UI_COPY.imported);
   updateReplaceBackupAction();
@@ -482,6 +514,11 @@ function triggerBackupDownload(downloadSpec) {
 
 function resetBackupImportState() {
   readyBackupPayload = null;
+  readyBackupOverlapDayCount = 0;
+  if (confirmOverlapImport) {
+    confirmOverlapImport.checked = false;
+  }
+  updateBackupOverlapWarning();
   setText(backupSelectedFile, BACKUP_UI_COPY.noFile);
   updateReplaceBackupAction();
 }
@@ -491,8 +528,27 @@ function updateReplaceBackupAction() {
     return;
   }
 
-  replaceBackupButton.disabled = !readyBackupPayload;
+  const needsOverlapConfirmation = readyBackupOverlapDayCount > 0 && !confirmOverlapImport?.checked;
+  replaceBackupButton.disabled = !readyBackupPayload || needsOverlapConfirmation;
   setText(replaceBackupButton, readyBackupPayload ? BACKUP_UI_COPY.replaceAction : BACKUP_UI_COPY.chooseFirst);
+}
+
+function updateBackupOverlapWarning() {
+  const hasOverlap = readyBackupOverlapDayCount > 0;
+
+  if (backupOverlapWarning) {
+    backupOverlapWarning.hidden = !hasOverlap;
+  }
+
+  if (backupOverlapCount) {
+    setText(backupOverlapCount, hasOverlap
+      ? `${readyBackupOverlapDayCount} overlapping day${readyBackupOverlapDayCount === 1 ? "" : "s"} found.`
+      : "");
+  }
+
+  if (!hasOverlap && confirmOverlapImport) {
+    confirmOverlapImport.checked = false;
+  }
 }
 
 function backupImportStatusText(result) {
@@ -501,6 +557,7 @@ function backupImportStatusText(result) {
     "unsupported-backup": BACKUP_UI_COPY.unsupported,
     "missing-store": BACKUP_UI_COPY.missingStore,
     "file-too-large": BACKUP_UI_COPY.oversized,
+    "overlapping-days": BACKUP_UI_COPY.overlapBlocked,
   }[code] || BACKUP_UI_COPY.invalid;
 
   return `${copy} ${BACKUP_UI_COPY.noWrite}`;

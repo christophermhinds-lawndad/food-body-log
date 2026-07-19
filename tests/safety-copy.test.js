@@ -135,9 +135,10 @@ test("runtime statuses expose visible text or marker plus text instead of color 
     "Editable",
     "No weight data for this period.",
     "Not enough logged data yet. Logged non-skipped meals will count here.",
-    "Backup looks ready to import. Review the confirmation before replacing local data.",
+    "Backup looks ready to import. Non-overlapping dates will be added to local data.",
+    "Backup has dates that overlap local data. Check the overwrite box before importing.",
     "Backup could not be read. Choose a Food Body Log JSON backup exported from this app.",
-    "Backup imported. Reopen each tab to see restored local data.",
+    "Backup imported. Reopen each tab to see updated local data.",
   ]) {
     assert.match(statusSource, new RegExp(escapeRegExp(copy)), `missing non-color status copy: ${copy}`);
   }
@@ -155,7 +156,8 @@ test("phase 6 UAT requires full suite before local and manual checks", async () 
 
   assert.ok(normalized.includes("node --test tests/*.test.js"), "missing full-suite prerequisite");
   assert.ok(normalized.includes("export download"), "missing export download check");
-  assert.ok(normalized.includes("valid import replace"), "missing valid import replace check");
+  assert.ok(normalized.includes("valid import merge"), "missing valid import merge check");
+  assert.ok(normalized.includes("valid import overlap confirmation"), "missing valid import overlap confirmation check");
   assert.ok(normalized.includes("invalid import no-write"), "missing invalid import no-write check");
   assert.ok(normalized.includes("settings storage warning"), "missing Settings storage warning check");
   assert.ok(normalized.includes("long filename wrapping"), "missing long filename wrapping check");

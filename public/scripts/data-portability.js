@@ -59,8 +59,8 @@ const UNAVAILABLE = Object.freeze({
 
 export const BACKUP_COPY = Object.freeze({
   exportReady: "Backup is ready to save.",
-  importReady: "Backup is ready to restore.",
-  importComplete: "Backup restored on this device.",
+  importReady: "Backup is ready to import.",
+  importComplete: "Backup imported on this device.",
   invalidBackup: "Choose a Food Body Log backup JSON file.",
 });
 
@@ -201,7 +201,74 @@ export async function replaceLocalDataFromBackup(payload) {
   });
 }
 
-export async function importSelectedBackup(file) {
+export async function inspectBackupImport(payload) {
+  const validation = validateBackupPayload(payload);
+
+  if (validation.status !== "Ready") {
+    return validation;
+  }
+
+  return withDb(async (db) => {
+    const plan = await createImportPlan(db, validation.payload.data);
+
+    return {
+      status: "Ready",
+      payload: validation.payload,
+      importedCounts: restoredCounts(validation.payload.data),
+      overlapDayCount: plan.overlapDayIDs.length,
+      overlapDayIDs: plan.overlapDayIDs,
+    };
+  });
+}
+
+export async function importLocalDataFromBackup(payload, options = {}) {
+  const validation = validateBackupPayload(payload);
+
+  if (validation.status !== "Ready") {
+    return validation;
+  }
+
+  return withDb(async (db) => {
+    const plan = await createImportPlan(db, validation.payload.data);
+
+    if (plan.overlapDayIDs.length > 0 && options.allowOverwrite !== true) {
+      return {
+        status: "NeedsOverlapConfirmation",
+        payload: validation.payload,
+        importedCounts: restoredCounts(validation.payload.data),
+        overlapDayCount: plan.overlapDayIDs.length,
+        overlapDayIDs: plan.overlapDayIDs,
+        error: {
+          code: "overlapping-days",
+        },
+      };
+    }
+
+    try {
+      await mergeStores(db, validation.payload.data, plan);
+    } catch (error) {
+      return {
+        available: true,
+        status: "Error",
+        payload: null,
+        error: {
+          code: "import-merge-failed",
+          message: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
+
+    return {
+      status: "Ready",
+      payload: validation.payload,
+      importedCounts: restoredCounts(validation.payload.data),
+      overlapDayCount: plan.overlapDayIDs.length,
+      overlapDayIDs: plan.overlapDayIDs,
+    };
+  });
+}
+
+export async function importSelectedBackup(file, options = {}) {
   if (!file || typeof file !== "object") {
     return invalidResult("missing-file");
   }
@@ -224,7 +291,7 @@ export async function importSelectedBackup(file) {
       return parsed;
     }
 
-    return replaceLocalDataFromBackup(parsed.payload);
+    return importLocalDataFromBackup(parsed.payload, options);
   } catch {
     return {
       available: true,
@@ -314,6 +381,105 @@ function replaceStores(db, data) {
       reject(error);
     }
   });
+}
+
+async function createImportPlan(db, data) {
+  const localRecords = Object.fromEntries(await Promise.all(
+    ["days", "meals", "weights", "journalAnswers"].map(async (storeName) => [
+      storeName,
+      await getAllRecords(db, storeName),
+    ]),
+  ));
+  const importDayIDs = collectDayIDs(data);
+  const localDayIDs = collectDayIDs(localRecords);
+  const overlapDayIDs = Array.from(importDayIDs)
+    .filter((dayID) => localDayIDs.has(dayID))
+    .sort();
+  const overlapDayIDSet = new Set(overlapDayIDs);
+
+  return {
+    overlapDayIDs,
+    deleteKeys: {
+      days: overlapDayIDs,
+      meals: localRecords.meals
+        .filter((record) => overlapDayIDSet.has(record.dayID))
+        .map((record) => record.id),
+      weights: overlapDayIDs,
+      journalAnswers: localRecords.journalAnswers
+        .filter((record) => overlapDayIDSet.has(record.dayID))
+        .map((record) => record.id),
+    },
+  };
+}
+
+function mergeStores(db, data, plan) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([...STORE_NAMES], "readwrite");
+    let requestError = null;
+    let operationCount = 0;
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(requestError || transaction.error);
+    transaction.onabort = () => reject(requestError || transaction.error);
+
+    try {
+      for (const [storeName, keys] of Object.entries(plan.deleteKeys)) {
+        for (const key of keys) {
+          operationCount += 1;
+          const deleteRequest = transaction.objectStore(storeName).delete(key);
+          deleteRequest.onerror = () => {
+            requestError = deleteRequest.error;
+          };
+        }
+      }
+
+      for (const storeName of STORE_NAMES) {
+        for (const record of data[storeName]) {
+          operationCount += 1;
+          const putRequest = transaction.objectStore(storeName).put(record);
+          putRequest.onerror = () => {
+            requestError = putRequest.error;
+          };
+        }
+      }
+
+      if (operationCount === 0) {
+        queueMicrotask(() => transaction.oncomplete?.());
+      }
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+function collectDayIDs(data) {
+  const dayIDs = new Set();
+
+  for (const day of data.days || []) {
+    if (day?.dayID) {
+      dayIDs.add(day.dayID);
+    }
+  }
+
+  for (const meal of data.meals || []) {
+    if (meal?.dayID) {
+      dayIDs.add(meal.dayID);
+    }
+  }
+
+  for (const weight of data.weights || []) {
+    if (weight?.dayID) {
+      dayIDs.add(weight.dayID);
+    }
+  }
+
+  for (const answer of data.journalAnswers || []) {
+    if (answer?.dayID) {
+      dayIDs.add(answer.dayID);
+    }
+  }
+
+  return dayIDs;
 }
 
 function normalizeRecord(storeName, record) {
