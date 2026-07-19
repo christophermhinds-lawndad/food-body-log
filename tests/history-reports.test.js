@@ -203,9 +203,12 @@ function keyMatches(value, expected) {
 
 async function loadModules(suffix) {
   const db = installFakeIndexedDb();
+  const storage = await import(`../public/scripts/storage.js?history=${suffix}`);
   const trackingModel = await import(`../public/scripts/tracking-model.js?history=${suffix}`);
   const journalModel = await import(`../public/scripts/journal-model.js?history=${suffix}`);
   const historyReports = await import(`../public/scripts/history-reports.js?history=${suffix}`);
+  const initializedDb = await storage.openAppDb();
+  initializedDb.close?.();
 
   return { db, historyReports, journalModel, trackingModel };
 }
@@ -353,9 +356,11 @@ test("history save rejects read-only days before writes and preserves omitted si
   seedWeight(db, EDITABLE_DAY_ID, 184.2);
   seedAnswer(db, EDITABLE_DAY_ID, "baseline-helped", { text: "Soup helped." });
 
+  const transactionCountBeforeReadOnly = db.transactions.length;
   const readOnlyResult = await historyReports.saveHistoryDay(READ_ONLY_DAY_ID, {
     weight: { value: 199 },
   }, { now: FIXED_NOW });
+  const readOnlyTransactions = db.transactions.slice(transactionCountBeforeReadOnly);
   const beforeEditableSave = snapshotStores(db);
   const editableResult = await historyReports.saveHistoryDay(EDITABLE_DAY_ID, {
     meals: {
@@ -372,7 +377,7 @@ test("history save rejects read-only days before writes and preserves omitted si
   assert.equal(readOnlyResult.available, true);
   assert.equal(readOnlyResult.status, "ReadOnly");
   assert.deepEqual(readOnlyResult.error, { code: "day-read-only", dayID: READ_ONLY_DAY_ID });
-  assert.ok(!db.transactions.includes("readwrite"), "read-only rejection must happen before readwrite transactions");
+  assert.deepEqual(readOnlyTransactions, [], "read-only rejection must happen before opening transactions");
 
   assert.equal(editableResult.status, "Ready");
   assert.equal(meals[`${EDITABLE_DAY_ID}:breakfast`].plannedText, "Eggs");
