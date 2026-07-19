@@ -304,6 +304,22 @@ test("reports styles provide numeric tile selectors and 390px wrapping backstops
   assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.reports-view,[\s\S]*\.reports-section,[\s\S]*\.reports-grid,[\s\S]*\.report-card[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
 });
 
+test("history reports and read-only states are not color-only", () => {
+  assert.match(css, /\.editable-badge[\s\S]*box-shadow: inset 4px 0 0 var\(--accent\);/);
+  assert.match(html, /aria-label="Editable or Read-only"/);
+
+  for (const statusText of [
+    "Read-only",
+    "Editable",
+    "No weight data for this period.",
+    "Not Enough Data Yet",
+    "No logged meals for this period.",
+    "Not enough logged data yet. Logged non-skipped meals will count here.",
+  ]) {
+    assert.match(`${html}\n${historyReportsSource}`, new RegExp(escapeRegExp(statusText)), `missing visible status text ${statusText}`);
+  }
+});
+
 test("reports surface stays numeric-only with no visualizations framing or network calls", () => {
   const forbiddenReportsCopy = /\b(?:trend|trending|improving|worsening|on track|off track|goal|target|success|failure|streak|perfect|cheat|bad food|good food|calories|macros|diet|weight-loss advice|medical advice)\b/i;
   const forbiddenReportSource = /\b(?:fetch|XMLHttpRequest|sendBeacon|canvas|svg|chart|sparkline|trendline|heatmap|delta|goal|target|red|green)\b/i;

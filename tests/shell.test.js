@@ -206,6 +206,33 @@ test("settings backup styling is mobile safe and wrapping aware", () => {
   assert.match(css, /@media \(max-width: 430px\)[\s\S]*\.backup-section,[\s\S]*\.backup-warning,[\s\S]*\.backup-controls,[\s\S]*\.backup-file-control,[\s\S]*\.backup-status,[\s\S]*\.backup-selected-file[\s\S]*grid-template-columns: minmax\(0, 1fr\);/);
 });
 
+test("primary flows keep iPhone 13 wrapping and bottom-tab clearance backstops", () => {
+  const mobileBlock = css.match(/@media \(max-width: 430px\)[\s\S]*$/)?.[0] || "";
+
+  for (const selector of [
+    ".app-shell",
+    ".meal-card-header",
+    ".button-row",
+    ".segmented-control",
+    ".journal-prompt-card",
+    ".breakthrough-card",
+    ".history-list",
+    ".day-detail",
+    ".reports-grid",
+    ".report-card",
+    ".backup-section",
+    ".backup-file-control",
+    ".tab-bar",
+    ".tab-button",
+  ]) {
+    assert.match(mobileBlock, new RegExp(escapeRegExp(selector)), `missing mobile backstop for ${selector}`);
+  }
+
+  assert.match(css, /padding: calc\(24px \+ env\(safe-area-inset-top\)\) 16px calc\(96px \+ env\(safe-area-inset-bottom\)\);/);
+  assert.match(mobileBlock, /overflow-wrap: anywhere;/);
+  assert.match(mobileBlock, /min-width: 0;/);
+});
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

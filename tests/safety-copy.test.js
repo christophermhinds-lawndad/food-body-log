@@ -121,6 +121,33 @@ test("runtime user-authored and imported text avoids raw html insertion sinks", 
   assert.match(appSource, /setText\(backupSelectedFile,/);
 });
 
+test("runtime statuses expose visible text or marker plus text instead of color alone", () => {
+  const statusSource = `${html}\n${appSource}\n${historyReportsSource}`;
+
+  for (const copy of [
+    "Not logged",
+    "Logged",
+    "Skipped",
+    "Yes",
+    "No",
+    "Read-only",
+    "Editable",
+    "No weight data for this period.",
+    "Not enough logged data yet. Logged non-skipped meals will count here.",
+    "Backup looks ready to import. Review the confirmation before replacing local data.",
+    "Backup could not be read. Choose a Food Body Log JSON backup exported from this app.",
+    "Backup imported. Reopen each tab to see restored local data.",
+  ]) {
+    assert.match(statusSource, new RegExp(escapeRegExp(copy)), `missing non-color status copy: ${copy}`);
+  }
+
+  assert.match(html, /class="status-marker"[^>]+data-state="notLogged"[^>]*>○<\/span>\s*<span data-status-text>Not logged<\/span>/);
+  assert.match(html, /class="tab-dot"/);
+  assert.match(html, /aria-label="Editable or Read-only"/);
+  assert.match(appSource, /setText\(reportNode\.querySelector\("\[data-report-value\]"\), tile\.value\)/);
+  assert.match(appSource, /setText\(importBackupStatus,/);
+});
+
 async function loadRuntimeFiles() {
   const scriptDir = new URL("../public/scripts/", import.meta.url);
   const scriptNames = (await readdir(scriptDir)).filter((name) => name.endsWith(".js")).sort();
