@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
     <link rel="stylesheet" href="./styles/app.css">
-    <script type="module" src="./scripts/app.js?v=11"></script>
+    <script type="module" src="./scripts/app.js?v=12"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -200,21 +200,28 @@
           <section class="reports-section" aria-labelledby="weight-reports-title">
             <h2 id="weight-reports-title">Weight averages</h2>
             <div id="weight-reports" class="reports-grid" aria-live="polite">
-              <article class="report-card" data-report-tile data-report-kind="weight" data-window-days="7">
-                <h3 data-report-title>Trailing 7 days</h3>
+              <article class="report-card" data-report-tile data-report-kind="weight" data-weight-summary-id="current7">
+                <h3 data-report-title>Current 7 day average</h3>
                 <p class="report-label" data-report-label>Weight average</p>
                 <p class="report-value" data-report-value>No weight data for this period.</p>
                 <p class="report-denominator" data-report-denominator>Based on 0 weight entries in this period.</p>
                 <p class="report-state" data-report-state></p>
               </article>
-              <article class="report-card" data-report-tile data-report-kind="weight" data-window-days="30">
+              <article class="report-card" data-report-tile data-report-kind="weight" data-weight-summary-id="previous7">
+                <h3 data-report-title>Previous 7 day average</h3>
+                <p class="report-label" data-report-label>Weight average</p>
+                <p class="report-value" data-report-value>No weight data for this period.</p>
+                <p class="report-denominator" data-report-denominator>Based on 0 weight entries in this period.</p>
+                <p class="report-state" data-report-state></p>
+              </article>
+              <article class="report-card" data-report-tile data-report-kind="weight" data-weight-summary-id="trailing30">
                 <h3 data-report-title>Trailing 30 days</h3>
                 <p class="report-label" data-report-label>Weight average</p>
                 <p class="report-value" data-report-value>No weight data for this period.</p>
                 <p class="report-denominator" data-report-denominator>Based on 0 weight entries in this period.</p>
                 <p class="report-state" data-report-state></p>
               </article>
-              <article class="report-card" data-report-tile data-report-kind="weight" data-window-days="90">
+              <article class="report-card" data-report-tile data-report-kind="weight" data-weight-summary-id="trailing90">
                 <h3 data-report-title>Trailing 90 days</h3>
                 <p class="report-label" data-report-label>Weight average</p>
                 <p class="report-value" data-report-value>No weight data for this period.</p>
@@ -272,12 +279,6 @@
             </form>
           </section>
 
-          <section class="journal-section" aria-labelledby="breakthrough-title">
-            <h2 id="breakthrough-title">Breakthroughs</h2>
-            <div id="breakthrough-list" class="breakthrough-list" aria-live="polite"></div>
-            <p id="breakthrough-message" class="status-message" aria-live="polite"></p>
-          </section>
-
           <template data-journal-prompt-template>
             <article class="journal-prompt-card" data-journal-answer-card>
               <label class="field-label" data-journal-prompt-label></label>
@@ -313,6 +314,11 @@
 
         <section class="view-panel history-view" data-view="history" hidden>
           <h2>History</h2>
+          <section class="history-breakthroughs" aria-labelledby="breakthrough-title">
+            <h2 id="breakthrough-title">Breakthroughs</h2>
+            <div id="breakthrough-list" class="breakthrough-list" aria-live="polite"></div>
+            <p id="breakthrough-message" class="status-message" aria-live="polite"></p>
+          </section>
           <p id="history-status" class="status-message" aria-live="polite">Loading history...</p>
           <div id="history-list" class="history-list" aria-live="polite"></div>
           <div id="history-pagination" class="history-pagination" aria-live="polite"></div>
@@ -452,13 +458,13 @@
           <span aria-hidden="true" class="tab-dot"></span>
           <span>Plan</span>
         </button>
-        <button class="tab-button" type="button" data-tab="reports" aria-controls="app-content" aria-selected="false">
-          <span aria-hidden="true" class="tab-dot"></span>
-          <span>Reports</span>
-        </button>
         <button class="tab-button" type="button" data-tab="journal" aria-controls="app-content" aria-selected="false">
           <span aria-hidden="true" class="tab-dot"></span>
           <span>Journal</span>
+        </button>
+        <button class="tab-button" type="button" data-tab="reports" aria-controls="app-content" aria-selected="false">
+          <span aria-hidden="true" class="tab-dot"></span>
+          <span>Reports</span>
         </button>
         <button class="tab-button" type="button" data-tab="history" aria-controls="app-content" aria-selected="false">
           <span aria-hidden="true" class="tab-dot"></span>

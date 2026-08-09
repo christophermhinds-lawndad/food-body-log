@@ -77,12 +77,20 @@ test("journal markup starts with usable reflection form and optional fields", ()
   assert.match(journalSurface, /id="journal-prompt-list"/);
   assert.match(journalSurface, /name="outside-plan" value="yes"/);
   assert.match(journalSurface, /name="outside-plan" value="no"/);
-  assert.match(journalSurface, /id="breakthrough-list"/);
   assert.match(journalSurface, /id="journal-message"[^>]+aria-live="polite"/);
-  assert.match(journalSurface, /id="breakthrough-message"[^>]+aria-live="polite"/);
   assert.match(journalSurface, /data-journal-prompt-template/);
   assert.match(journalSurface, /data-breakthrough-template/);
   assert.doesNotMatch(journalSurface, /<textarea[^>]*required|required[^>]*<textarea/);
+});
+
+test("history markup starts with saved breakthroughs before collapsed history accordions", () => {
+  const historySurface = html.match(/<section class="view-panel[^"]*" data-view="history"[\s\S]*?<\/section>\s*<section class="view-panel[^"]*" data-view="settings"/)?.[0] || "";
+
+  assert.match(historySurface, /<section class="history-breakthroughs"[^>]+aria-labelledby="breakthrough-title"/);
+  assert.match(historySurface, /id="breakthrough-list"/);
+  assert.match(historySurface, /id="breakthrough-message"[^>]+aria-live="polite"/);
+  assert.match(historySurface, /id="history-list"/);
+  assert.ok(historySurface.indexOf('id="breakthrough-list"') < historySurface.indexOf('id="history-list"'));
 });
 
 test("journal controller imports repository and wires load save breakthrough actions", () => {
@@ -116,10 +124,11 @@ test("journal dynamic rendering uses DOM nodes and scoped closest actions", () =
   assert.doesNotMatch(runtimeSource, /\bouterHTML\s*=/);
 });
 
-test("breakthrough metadata actions save unsaved reflection fields before reloading", () => {
+test("breakthrough metadata actions save unsaved reflection fields before changing journal highlights", () => {
   assert.match(appSource, /async function saveCurrentJournalDraft\(\)/);
   assert.match(appSource, /async function toggleAnswerBreakthrough\(button\)[\s\S]*const saved = await saveCurrentJournalDraft\(\);[\s\S]*const result = await setAnswerBreakthrough/);
-  assert.match(appSource, /async function dropSelectedBreakthrough\(button\)[\s\S]*const saved = await saveCurrentJournalDraft\(\);[\s\S]*const result = await dropBreakthrough/);
+  assert.match(appSource, /async function dropSelectedBreakthrough\(button\)[\s\S]*const result = await dropBreakthrough/);
+  assert.match(appSource, /async function dropSelectedBreakthrough\(button\)[\s\S]*renderBreakthroughs\(result\.breakthroughs \|\| \[\]\)/);
 });
 
 test("today meal cards still exclude reflection controls", () => {

@@ -464,16 +464,19 @@ test("reports expose trailing weight averages and sparse meal metric states", as
   ], "ateWhenHungry", { now: FIXED_NOW });
   const state = await historyReports.getReportsState({ now: FIXED_NOW });
 
-  assert.deepEqual(noWeight.map((summary) => summary.state), ["NoData", "NotEnoughData", "NotEnoughData"]);
+  assert.deepEqual(noWeight.map((summary) => summary.state), ["NoData", "NoData", "NotEnoughData", "NotEnoughData"]);
+  assert.deepEqual(noWeight.map((summary) => summary.display), [true, true, false, false]);
   assert.equal(oneMeal.state, "Insufficient");
   assert.equal(oneMeal.percentage, null);
-  assert.deepEqual(state.weightAverages.map((summary) => [summary.windowDays, summary.state, summary.count, summary.average]), [
-    [7, "Ready", 3, 183.3],
-    [30, "NotEnoughData", 4, null],
-    [90, "NotEnoughData", 4, null],
+  assert.deepEqual(state.weightAverages.map((summary) => [summary.id, summary.windowDays, summary.state, summary.count, summary.average, summary.display]), [
+    ["current7", 7, "Ready", 3, 183.3, true],
+    ["previous7", 7, "NoData", 0, null, true],
+    ["trailing30", 30, "NotEnoughData", 4, null, false],
+    ["trailing90", 90, "NotEnoughData", 4, null, false],
   ]);
   assert.deepEqual(state.weightAverages.map((summary) => summary.periodLabel), [
-    "Trailing 7 days",
+    "Current 7 day average",
+    "Previous 7 day average",
     "Trailing 30 days",
     "Trailing 90 days",
   ]);
@@ -485,6 +488,30 @@ test("reports expose trailing weight averages and sparse meal metric states", as
   assert.equal(historyReports.formatWeightAverage(183.3), "183.3");
 });
 
+test("weight average tile visibility uses elapsed date coverage instead of entry count", async () => {
+  const oldEnough = await loadModules("reports-weight-elapsed-old-enough");
+  seedWeightRange(oldEnough.db, -31, -12, 200);
+
+  const oldEnoughState = await oldEnough.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.deepEqual(oldEnoughState.weightAverages.map((summary) => [summary.id, summary.state, summary.display]), [
+    ["current7", "NoData", true],
+    ["previous7", "Ready", true],
+    ["trailing30", "Ready", true],
+    ["trailing90", "NotEnoughData", false],
+  ]);
+
+  const tooRecent = await loadModules("reports-weight-elapsed-too-recent");
+  seedWeightRange(tooRecent.db, -27, -3, 200);
+
+  const tooRecentState = await tooRecent.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.deepEqual(tooRecentState.weightAverages.map((summary) => [summary.id, summary.state, summary.display]), [
+    ["current7", "Ready", true],
+    ["previous7", "Ready", true],
+    ["trailing30", "NotEnoughData", false],
+    ["trailing90", "NotEnoughData", false],
+  ]);
+});
+
 test("weight report summary emits comparison narratives and threshold notices", async () => {
   const progressing = await loadModules("reports-progressing");
   seedWeightRange(progressing.db, -89, -30, 205.5);
@@ -493,10 +520,11 @@ test("weight report summary emits comparison narratives and threshold notices", 
   seedWeightRange(progressing.db, -6, 0, 190);
 
   const progressingState = await progressing.historyReports.getReportsState({ now: FIXED_NOW });
-  assert.deepEqual(progressingState.weightAverages.map((summary) => [summary.windowDays, summary.state, summary.average]), [
-    [7, "Ready", 190],
-    [30, "Ready", 195],
-    [90, "Ready", 202],
+  assert.deepEqual(progressingState.weightAverages.map((summary) => [summary.id, summary.windowDays, summary.state, summary.average, summary.display]), [
+    ["current7", 7, "Ready", 190, true],
+    ["previous7", 7, "Ready", 191.2, true],
+    ["trailing30", 30, "Ready", 195, true],
+    ["trailing90", 90, "Ready", 202, true],
   ]);
   assert.equal(progressingState.weightSummary.notice.kind, "Progressing");
   assert.equal(progressingState.weightSummary.notice.text, "Weight notice: Saved entries are lower across some periods. These numbers are for observation only; no action is required here.");

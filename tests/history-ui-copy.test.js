@@ -49,7 +49,8 @@ const requiredReportsCopy = [
   "Loading reports...",
   "Reports could not be loaded. Reopen the app and try again. Data already saved on this device stays local.",
   "Weight averages",
-  "Trailing 7 days",
+  "Current 7 day average",
+  "Previous 7 day average",
   "Trailing 30 days",
   "Trailing 90 days",
   "Based on {count} weight entry/entries in this period.",
@@ -249,7 +250,8 @@ test("reports shell exposes fixed numeric groups and tile template", () => {
     "Weight summary",
     "Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.",
     "Meal metrics",
-    "Trailing 7 days",
+    "Current 7 day average",
+    "Previous 7 day average",
     "Trailing 30 days",
     "Trailing 90 days",
     "Ate when hungry",
@@ -258,7 +260,7 @@ test("reports shell exposes fixed numeric groups and tile template", () => {
     assert.match(html, new RegExp(escapeRegExp(expected)), `missing Reports shell artifact ${expected}`);
   }
 
-  assert.equal((reportsPanelHtml().match(/data-report-tile(?:\s|=)/g) || []).length, 5);
+  assert.equal((reportsPanelHtml().match(/data-report-tile(?:\s|=)/g) || []).length, 6);
   assert.doesNotMatch(reportsPanelHtml(), /<canvas\b|<svg\b|<table\b/i);
 });
 

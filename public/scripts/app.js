@@ -1,14 +1,14 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=11";
+import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=12";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
 import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=4";
 import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
 import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=2";
-import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough } from "./journal-tracking.js?v=2";
-import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=2";
+import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough, getBreakthroughs } from "./journal-tracking.js?v=2";
+import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=3";
 import { createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText } from "./data-portability.js?v=3";
 
 const appPaths = createAppPaths();
@@ -17,7 +17,7 @@ const titles = {
   today: "Today",
   plan: "Plan meals",
   reports: "Reports",
-  journal: "Journal & Breakthroughs",
+  journal: "Journal",
   history: "History",
   settings: "Settings",
 };
@@ -264,7 +264,7 @@ historyList?.addEventListener("click", (event) => {
   const button = event.target?.closest?.("[data-history-day]");
 
   if (button?.dataset.dayId) {
-    loadSelectedHistoryDay(button.dataset.dayId, { focusDetail: true });
+    toggleSelectedHistoryDay(button.dataset.dayId);
   }
 });
 
@@ -699,14 +699,15 @@ function renderWeightSummary(summary) {
 }
 
 function renderWeightReportTiles(weightAverages) {
-  for (const windowDays of [7, 30, 90]) {
-    const tile = weightAverages.find((candidate) => candidate.windowDays === windowDays) || {
-      windowDays,
-      periodLabel: `Trailing ${windowDays} days`,
+  for (const summaryID of ["current7", "previous7", "trailing30", "trailing90"]) {
+    const tile = weightAverages.find((candidate) => candidate.id === summaryID) || {
+      id: summaryID,
+      periodLabel: summaryID === "previous7" ? "Previous 7 day average" : "Current 7 day average",
       state: "NoData",
       count: 0,
       average: null,
       formattedAverage: "",
+      display: summaryID === "current7" || summaryID === "previous7",
     };
     renderWeightReportTile(tile);
   }
@@ -728,7 +729,17 @@ function renderMealReportTiles(mealMetrics) {
 }
 
 function renderWeightReportTile(tile) {
-  const card = weightReports?.querySelector(`[data-report-kind="weight"][data-window-days="${tile.windowDays}"]`);
+  const card = weightReports?.querySelector(`[data-report-kind="weight"][data-weight-summary-id="${tile.id}"]`);
+  const shouldDisplay = tile.display !== false;
+
+  if (card) {
+    card.hidden = !shouldDisplay;
+  }
+
+  if (!shouldDisplay) {
+    return;
+  }
+
   renderReportTile(card, {
     title: tile.periodLabel,
     label: "Weight average",
@@ -826,7 +837,6 @@ async function loadJournalView() {
   setJournalFormDisabled(true);
   setText(journalDay, requestedDayID);
   setText(journalMessage, JOURNAL_LOAD_MESSAGE);
-  setText(breakthroughMessage, "");
   const state = await getJournalState(requestedDayID);
 
   if (requestID !== journalLoadRequestID || requestedDayID !== journalDayID) {
@@ -836,7 +846,6 @@ async function loadJournalView() {
   if (!state.available) {
     setJournalFormDisabled(false);
     setText(journalMessage, JOURNAL_UNAVAILABLE_MESSAGE);
-    renderBreakthroughs([]);
     return;
   }
 
@@ -940,29 +949,20 @@ async function dropSelectedBreakthrough(button) {
     return;
   }
 
-  setJournalFormDisabled(true);
-  const saved = await saveCurrentJournalDraft();
-  if (!saved) {
-    setJournalFormDisabled(false);
-    setText(breakthroughMessage, JOURNAL_SAVE_ERROR_MESSAGE);
-    return;
-  }
-
-  if (!isReadyResult(saved)) {
-    setJournalFormDisabled(false);
-    setText(breakthroughMessage, JOURNAL_SAVE_ERROR_MESSAGE);
-    return;
-  }
-
   const result = await dropBreakthrough(answerID);
-  setJournalFormDisabled(false);
 
   if (!isReadyResult(result)) {
     setText(breakthroughMessage, "Breakthrough could not be removed. Try again.");
     return;
   }
 
-  await loadJournalView();
+  renderBreakthroughs(result.breakthroughs || []);
+
+  if (historySelectedDayID) {
+    const selectedDayID = historySelectedDayID;
+    await loadSelectedHistoryDay(selectedDayID, { scrollCard: false });
+  }
+
   setText(breakthroughMessage, DROP_SUCCESS_MESSAGE);
 }
 
@@ -971,7 +971,11 @@ async function loadHistoryView() {
   historyLoadRequestID = requestID;
   setText(historyStatus, HISTORY_COPY.loading);
   setText(historySaveMessage, "");
-  const state = await getHistoryState();
+  setText(breakthroughMessage, "");
+  const [state, breakthroughsState] = await Promise.all([
+    getHistoryState(),
+    getBreakthroughs(),
+  ]);
 
   if (requestID !== historyLoadRequestID) {
     return;
@@ -979,7 +983,8 @@ async function loadHistoryView() {
 
   const sourceDayID = pendingHistorySourceDayID;
   pendingHistorySourceDayID = "";
-  renderHistoryState(state, { preferredDayID: sourceDayID || historySelectedDayID });
+  renderBreakthroughs(breakthroughsState.available ? breakthroughsState.breakthroughs : []);
+  renderHistoryState(state, { preferredDayID: sourceDayID });
 
   if (!state.available) {
     return;
@@ -988,7 +993,7 @@ async function loadHistoryView() {
   if (sourceDayID && isHistoryDayViewable(sourceDayID)) {
     await loadSelectedHistoryDay(sourceDayID, {
       sourceDay: true,
-      focusDetail: true,
+      scrollCard: true,
     });
     return;
   }
@@ -1000,20 +1005,6 @@ async function loadHistoryView() {
   if (state.days.length === 0) {
     return;
   }
-
-  const viewableDays = historyViewableDays();
-  const selectedDayID = sourceDayID && isHistoryDayViewable(sourceDayID)
-    ? sourceDayID
-    : (viewableDays.some((day) => day.dayID === historySelectedDayID) ? historySelectedDayID : viewableDays[0]?.dayID);
-
-  if (!selectedDayID) {
-    return;
-  }
-
-  await loadSelectedHistoryDay(selectedDayID, {
-    sourceDay: false,
-    focusDetail: false,
-  });
 }
 
 async function loadSelectedHistoryDay(dayID, options = {}) {
@@ -1045,6 +1036,10 @@ async function loadSelectedHistoryDay(dayID, options = {}) {
   renderHistoryDayDetail(state);
   setText(historyStatus, options.sourceDay ? HISTORY_COPY.sourceDayOpened : "");
 
+  if (options.scrollCard) {
+    scrollHistoryCardIntoView(requestedDayID);
+  }
+
   if (options.focusDetail) {
     focusHistoryDetail();
   }
@@ -1055,6 +1050,9 @@ function renderHistoryState(state, options = {}) {
   replaceChildren(historyList);
   renderHistoryPagination();
   currentHistoryDayState = null;
+  historySelectedDayID = "";
+  pendingHistoryWeightConfirmation = null;
+  historyDetail.hidden = true;
   setText(historySaveMessage, "");
 
   if (!state.available) {
@@ -1216,11 +1214,7 @@ function changeHistoryPage(action) {
   historySelectedDayID = "";
   pendingHistoryWeightConfirmation = null;
   renderHistoryState(currentHistoryState);
-  const firstPageDayID = historyPageDays()[0]?.dayID || "";
-
-  if (firstPageDayID) {
-    loadSelectedHistoryDay(firstPageDayID, { focusDetail: false });
-  }
+  collapseSelectedHistoryDay("", { scrollCard: false });
 }
 
 function historyViewableDays() {
@@ -1370,6 +1364,48 @@ function markSelectedHistoryDay(dayID) {
 function historyCardForDay(dayID) {
   return Array.from(historyList?.querySelectorAll(".history-day-card") || [])
     .find((card) => card.dataset.dayId === dayID) || null;
+}
+
+function toggleSelectedHistoryDay(dayID) {
+  const requestedDayID = String(dayID || "");
+
+  if (!requestedDayID) {
+    return;
+  }
+
+  if (historySelectedDayID === requestedDayID && historyDetail && !historyDetail.hidden) {
+    collapseSelectedHistoryDay(requestedDayID, { scrollCard: true });
+    return;
+  }
+
+  loadSelectedHistoryDay(requestedDayID, { scrollCard: true });
+}
+
+function collapseSelectedHistoryDay(dayID = historySelectedDayID, options = {}) {
+  const requestedDayID = String(dayID || "");
+  historyDayLoadRequestID += 1;
+  historySelectedDayID = "";
+  currentHistoryDayState = null;
+  pendingHistoryWeightConfirmation = null;
+
+  if (historyDetail) {
+    historyDetail.hidden = true;
+  }
+
+  markSelectedHistoryDay("");
+  setText(historySaveMessage, "");
+
+  if (requestedDayID && options.scrollCard) {
+    scrollHistoryCardIntoView(requestedDayID);
+  }
+}
+
+function scrollHistoryCardIntoView(dayID) {
+  historyCardForDay(dayID)?.scrollIntoView({
+    block: "start",
+    inline: "nearest",
+    behavior: "auto",
+  });
 }
 
 function renderHistoryWeight(weight, isEditable) {
@@ -1784,7 +1820,6 @@ function renderJournalState(state) {
   setOutsidePlanChoice(state.outsidePlanAnswer?.text || "");
   renderJournalPrompts(state.prompts, state.answers);
   renderJournalHelper(state);
-  renderBreakthroughs(state.breakthroughs);
 }
 
 function updateJournalPromptsForOutsidePlanChoice() {

@@ -19,7 +19,36 @@ const DAYS_STORE = "days";
 const MEALS_STORE = "meals";
 const WEIGHTS_STORE = "weights";
 const JOURNAL_ANSWERS_STORE = "journalAnswers";
-const WEIGHT_WINDOWS = Object.freeze([7, 30, 90]);
+const WEIGHT_AVERAGE_TILE_DEFS = Object.freeze([
+  {
+    id: "current7",
+    periodLabel: "Current 7 day average",
+    kind: "trailing",
+    windowDays: 7,
+    displayWhenNotEnoughData: true,
+  },
+  {
+    id: "previous7",
+    periodLabel: "Previous 7 day average",
+    kind: "previousTrailing",
+    windowDays: 7,
+    displayWhenNotEnoughData: true,
+  },
+  {
+    id: "trailing30",
+    periodLabel: "Trailing 30 days",
+    kind: "trailing",
+    windowDays: 30,
+    requireElapsedCoverage: true,
+  },
+  {
+    id: "trailing90",
+    periodLabel: "Trailing 90 days",
+    kind: "trailing",
+    windowDays: 90,
+    requireElapsedCoverage: true,
+  },
+]);
 const REPORT_MEAL_WINDOW_DAYS = 7;
 const LARGE_WEIGHT_CHANGE_THRESHOLD = 5;
 const WEIGHT_STATUS_THRESHOLDS = Object.freeze({
@@ -85,7 +114,8 @@ export const REPORTS_COPY = Object.freeze({
   loading: "Loading reports...",
   error: "Reports could not be loaded. Reopen the app and try again. Data already saved on this device stays local.",
   weightHeading: "Weight averages",
-  weightSevenDays: "Trailing 7 days",
+  weightSevenDays: "Current 7 day average",
+  weightPreviousSevenDays: "Previous 7 day average",
   weightThirtyDays: "Trailing 30 days",
   weightNinetyDays: "Trailing 90 days",
   weightDenominator: "Based on {count} weight entry/entries in this period.",
@@ -163,23 +193,22 @@ export async function getHistoryDay(dayID, options = {}) {
 }
 
 export async function saveHistoryDay(dayID, draft = {}, options = {}) {
-  if (!isEditableDay(dayID, options)) {
-    return {
-      available: true,
-      status: "ReadOnly",
-      day: { dayID },
-      meals: [],
-      weight: null,
-      answers: [],
-      breakthroughs: [],
-      error: {
-        code: "day-read-only",
-        dayID,
-      },
-    };
-  }
-
   return withDb(async (db) => {
+    if (!isEditableDay(dayID, options)) {
+      return {
+        status: "ReadOnly",
+        day: { dayID },
+        meals: [],
+        weight: null,
+        answers: [],
+        breakthroughs: [],
+        error: {
+          code: "day-read-only",
+          dayID,
+        },
+      };
+    }
+
     const existingWeight = await getRecord(db, WEIGHTS_STORE, dayID);
     const requestedWeight = hasOwn(draft, "weight") ? normalizeWeightValue(draft.weight?.value) : null;
 
@@ -247,18 +276,18 @@ export async function getReportsState(options = {}) {
 }
 
 export function summarizeWeightAverages(weights, options = {}) {
-  return WEIGHT_WINDOWS.map((windowDays) => {
-    const summary = averageForTrailingWindow(weights, windowDays, options, {
-      requireFullWindow: windowDays !== 7,
-    });
+  return WEIGHT_AVERAGE_TILE_DEFS.map((tileDef) => {
+    const summary = averageForWeightTile(weights, tileDef, options);
 
     return {
-      windowDays,
-      periodLabel: `Trailing ${windowDays} days`,
+      id: tileDef.id,
+      windowDays: tileDef.windowDays,
+      periodLabel: tileDef.periodLabel,
       state: summary.state,
       count: summary.count,
       average: summary.average,
       formattedAverage: formatWeightAverage(summary.average),
+      display: tileDef.displayWhenNotEnoughData || summary.state !== "NotEnoughData",
     };
   });
 }
@@ -548,6 +577,21 @@ function averageForTrailingWindow(weights, windowDays, options = {}, config = {}
   }
 
   return averageForDayRange(validWeights, startDayID, endDayID);
+}
+
+function averageForWeightTile(weights, tileDef, options = {}) {
+  if (tileDef.kind === "previousTrailing") {
+    const todayID = getLocalDayID(options.now || new Date());
+    return averageForDayRange(
+      validWeightRecords(weights),
+      addDays(todayID, -13),
+      addDays(todayID, -7),
+    );
+  }
+
+  return averageForTrailingWindow(weights, tileDef.windowDays, options, {
+    requireFullWindow: tileDef.requireElapsedCoverage === true,
+  });
 }
 
 function averageForDayRange(weights, startDayID, endDayID) {

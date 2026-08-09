@@ -6,19 +6,27 @@ const html = await readFile(new URL("../public/index.html", import.meta.url), "u
 const css = await readFile(new URL("../public/styles/app.css", import.meta.url), "utf8");
 
 test("shell markup exposes all tabs with Today active by default", () => {
-  const tabLabels = ["Today", "Plan", "Reports", "Journal", "History", "Settings"];
+  const tabLabels = ["Today", "Plan", "Journal", "Reports", "History", "Settings"];
 
   for (const label of tabLabels) {
     assert.match(html, new RegExp(`>${label}<`), `missing ${label} tab label`);
   }
 
+  assert.deepEqual(Array.from(html.matchAll(/data-tab="([^"]+)"/g)).map((match) => match[1]), [
+    "today",
+    "plan",
+    "journal",
+    "reports",
+    "history",
+    "settings",
+  ]);
   assert.match(html, /<button[^>]+data-tab="today"[^>]+aria-selected="true"/);
   assert.match(html, /<main[^>]+id="app-content"/);
 });
 
 test("shell uses relative app assets and install metadata", () => {
   assert.match(html, /href="\.\/styles\/app\.css"/);
-  assert.match(html, /src="\.\/scripts\/app\.js\?v=11"/);
+  assert.match(html, /src="\.\/scripts\/app\.js\?v=12"/);
   assert.match(html, /type="module"/);
   assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
   assert.match(html, /rel="apple-touch-icon" href="\.\/icons\/apple-touch-icon\.png"/);
@@ -84,19 +92,19 @@ test("plan shell gives every meal field an associated inline suggestion containe
   assert.equal((html.match(/data-plan-suggestions=/g) || []).length, 4);
 });
 
-test("journal shell exposes reflection and breakthrough containers", () => {
+test("journal shell exposes reflection containers", () => {
   assert.match(html, /data-view="journal"/);
   assert.match(html, /id="journal-form"/);
   assert.match(html, /id="journal-prompt-list"/);
   assert.match(html, /id="journal-message" class="status-message" aria-live="polite"/);
-  assert.match(html, /id="breakthrough-list"/);
-  assert.match(html, /id="breakthrough-message" class="status-message" aria-live="polite"/);
   assert.match(html, /data-journal-prompt-template/);
   assert.match(html, /data-breakthrough-template/);
 });
 
-test("history shell exposes browse detail and edit containers", () => {
+test("history shell exposes breakthroughs browse detail and edit containers", () => {
   assert.match(html, /data-view="history"/);
+  assert.match(html, /id="breakthrough-list"/);
+  assert.match(html, /id="breakthrough-message" class="status-message" aria-live="polite"/);
   assert.match(html, /id="history-status" class="status-message" aria-live="polite"/);
   assert.match(html, /id="history-list" class="history-list" aria-live="polite"/);
   assert.match(html, /id="history-pagination" class="history-pagination" aria-live="polite"/);
@@ -118,7 +126,9 @@ test("reports shell exposes fixed numeric summary containers", () => {
   assert.match(html, /Weight averages/);
   assert.match(html, /Meal metrics/);
   assert.match(html, /Numeric summaries use only saved local entries/);
-  assert.equal((html.match(/data-report-tile(?:\s|=)/g) || []).length, 5);
+  assert.match(html, /Current 7 day average/);
+  assert.match(html, /Previous 7 day average/);
+  assert.equal((html.match(/data-report-tile(?:\s|=)/g) || []).length, 6);
 });
 
 test("journal styling uses compact mobile-safe cards chips and actions", () => {
