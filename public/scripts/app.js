@@ -1,15 +1,15 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=12";
+import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=13";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
-import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
-import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=4";
+import { MEAL_ANSWERS, MEAL_LEVELS, MEAL_STATES, isMealLevelAnswered, mealLevelLabel, normalizeMealLevel } from "./tracking-model.js?v=4";
+import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=5";
 import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
-import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=2";
-import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough, getBreakthroughs } from "./journal-tracking.js?v=2";
-import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=3";
-import { createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText } from "./data-portability.js?v=3";
+import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=3";
+import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough, getBreakthroughs } from "./journal-tracking.js?v=3";
+import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=4";
+import { createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText } from "./data-portability.js?v=4";
 
 const appPaths = createAppPaths();
 
@@ -28,8 +28,11 @@ const statusValueNodes = Object.fromEntries(
 const settingsMessage = document.querySelector("#settings-message");
 const weightForm = document.querySelector("#weight-form");
 const weightInput = document.querySelector("#weight-value");
+const waistInput = document.querySelector("#waist-value");
 const weightMessage = document.querySelector("#weight-message");
 const todayDate = document.querySelector("#today-date");
+const todaySupportText = document.querySelector("#today-support-text");
+const todaySupportSource = document.querySelector("#today-support-source");
 const planForm = document.querySelector("#plan-form");
 const planMessage = document.querySelector("#plan-message");
 const journalForm = document.querySelector("#journal-form");
@@ -78,8 +81,8 @@ const SUGGESTION_ERROR_MESSAGE = "Suggestions could not be loaded. You can keep 
 const JOURNAL_LOAD_MESSAGE = "Loading evening reflection...";
 const JOURNAL_UNAVAILABLE_MESSAGE = "Evening reflection could not be loaded. Reopen the app and try again.";
 const JOURNAL_SAVE_ERROR_MESSAGE = "Reflection could not be saved. Try again; data already saved on this device stays local.";
-const NO_EXTRA_PROMPTS_MESSAGE = "Nothing extra to reflect on from today's meal answers. You can still write anything that feels useful.";
-const MISSING_MEAL_DATA_MESSAGE = "Not all meals are logged yet. That is okay; only logged non-skipped No answers add extra prompts.";
+const NO_EXTRA_PROMPTS_MESSAGE = "Nothing extra to reflect on from today's meal levels. You can still write anything that feels useful.";
+const MISSING_MEAL_DATA_MESSAGE = "Not all meals are logged yet. That is okay; only logged low-hunger or high-satiety meals add extra prompts.";
 const DROP_SUCCESS_MESSAGE = "Breakthrough removed. The original answer stayed saved.";
 const MAX_BACKUP_FILE_BYTES = 2_000_000;
 const HISTORY_PAGE_SIZE = 5;
@@ -159,6 +162,14 @@ weightForm?.addEventListener("submit", (event) => {
   saveTodayWeight();
 });
 
+document.addEventListener("input", (event) => {
+  const input = event.target?.closest?.("[data-meal-level]");
+
+  if (input) {
+    markMealLevelAnswered(input);
+  }
+});
+
 planForm?.addEventListener("submit", (event) => {
   event.preventDefault();
   saveSelectedPlan();
@@ -205,6 +216,11 @@ planForm?.addEventListener("focusout", (event) => {
 
 document.addEventListener("pointerdown", (event) => {
   const target = event.target;
+  const mealLevelInput = target?.closest?.("[data-meal-level]");
+
+  if (mealLevelInput) {
+    markMealLevelAnswered(mealLevelInput);
+  }
 
   if (!target?.closest?.("[data-plan-slot]") && !target?.closest?.("[data-plan-suggestions]")) {
     planSuggestions.hideAll();
@@ -716,13 +732,14 @@ function renderWeightReportTiles(weightAverages) {
 function renderMealReportTiles(mealMetrics) {
   for (const metricName of ["ateWhenHungry", "stoppedAtEnough"]) {
     const tile = mealMetrics.find((candidate) => candidate.metricName === metricName) || {
+      kind: "mealLevel",
       metricName,
       label: metricName === "stoppedAtEnough" ? REPORTS_COPY.enoughLabel : REPORTS_COPY.hungryLabel,
-      periodLabel: REPORTS_COPY.weightSevenDays,
+      periodLabel: REPORTS_COPY.mealSevenDays,
       state: "NoData",
-      yesCount: 0,
       denominator: 0,
-      percentage: null,
+      average: null,
+      formattedAverage: "",
     };
     renderMealReportTile(tile);
   }
@@ -775,16 +792,20 @@ function renderReportTile(card, tile) {
 }
 
 function reportValueText(tile) {
+  if (tile.kind === "mealLevel") {
+    if (tile.state === "Ready") {
+      return `${tile.formattedAverage || String(tile.average)} / 4`;
+    }
+
+    return REPORTS_COPY.mealNoData;
+  }
+
   if (Object.hasOwn(tile, "average")) {
     if (tile.state === "Ready") {
       return tile.formattedAverage || String(tile.average);
     }
 
     return tile.state === "NotEnoughData" ? REPORTS_COPY.weightNotEnoughData : REPORTS_COPY.weightNoData;
-  }
-
-  if (tile.state === "Ready") {
-    return `${tile.percentage}%`;
   }
 
   if (tile.state === "Insufficient") {
@@ -795,6 +816,14 @@ function reportValueText(tile) {
 }
 
 function reportDenominatorText(tile) {
+  if (tile.kind === "mealLevel") {
+    const denominator = Number(tile.denominator || 0);
+    const noun = denominator === 1 ? "entry" : "entries";
+    return REPORTS_COPY.mealDenominator
+      .replace("{denominator}", String(denominator))
+      .replace("entry/entries", noun);
+  }
+
   if (Object.hasOwn(tile, "average")) {
     const count = Number(tile.count || 0);
     const noun = count === 1 ? "entry" : "entries";
@@ -802,12 +831,6 @@ function reportDenominatorText(tile) {
   }
 
   const denominator = Number(tile.denominator || 0);
-
-  if (tile.state === "Ready") {
-    return REPORTS_COPY.mealDenominator
-      .replace("{yesCount}", String(tile.yesCount || 0))
-      .replace("{denominator}", String(denominator));
-  }
 
   return denominator === 1 ? "1 logged non-skipped meal in this period." : `${denominator} logged non-skipped meals in this period.`;
 }
@@ -885,7 +908,6 @@ function serializeJournalAnswers() {
     [OUTSIDE_PLAN_PROMPT_ID]: {
       text: selectedOutsidePlanValue(),
       selectedChipIDs: [],
-      detail: "",
     },
     ...Object.fromEntries(Array.from(document.querySelectorAll("[data-journal-answer-card]"))
     .map((card) => {
@@ -895,7 +917,6 @@ function serializeJournalAnswers() {
       return [card.dataset.promptId, {
         text: card.querySelector("[data-journal-answer-text]")?.value || "",
         selectedChipIDs,
-        detail: card.querySelector("[data-journal-detail-text]")?.value || "",
       }];
     })),
   };
@@ -1147,6 +1168,7 @@ async function saveSelectedHistoryDay() {
 
 function serializeHistoryDraft() {
   const weightValue = historyDetail?.querySelector("[data-history-weight-input]")?.value?.trim() || "";
+  const waistValue = historyDetail?.querySelector("[data-history-waist-input]")?.value?.trim() || "";
   const draft = {
     meals: Object.fromEntries(Array.from(historyDetail?.querySelectorAll("[data-history-meal-card]") || [])
       .map((card) => {
@@ -1167,8 +1189,11 @@ function serializeHistoryDraft() {
       }])),
   };
 
-  if (weightValue !== "" || currentHistoryDayState?.weight?.value != null) {
-    draft.weight = { value: weightValue };
+  if (weightValue !== "" || waistValue !== "" || currentHistoryDayState?.weight?.value != null || currentHistoryDayState?.weight?.waist != null) {
+    draft.weight = {
+      value: weightValue,
+      waist: waistValue,
+    };
   }
 
   return draft;
@@ -1413,29 +1438,40 @@ function renderHistoryWeight(weight, isEditable) {
   const section = document.createElement("section");
   const heading = document.createElement("h3");
   section.className = "history-detail-section";
-  setText(heading, "Weight");
+  setText(heading, "Weight and waist");
   section.append(heading);
 
   if (isEditable) {
-    const label = document.createElement("label");
-    const input = document.createElement("input");
-    label.className = "field-label";
-    label.setAttribute("for", "history-weight-value");
-    setText(label, "Weight");
-    input.id = "history-weight-value";
-    input.className = "text-field";
-    input.type = "number";
-    input.inputMode = "decimal";
-    input.step = "0.1";
-    input.min = "0";
-    input.dataset.historyWeightInput = "true";
-    input.value = weight?.value == null ? "" : String(weight.value);
-    section.append(label, input);
+    section.append(
+      createMeasurementField("history-weight-value", "Weight", "historyWeightInput", weight?.value),
+      createMeasurementField("history-waist-value", "Waist measurement", "historyWaistInput", weight?.waist),
+    );
   } else {
     section.append(createValueRow("Weight", weight?.value == null ? HISTORY_COPY.noWeight : String(weight.value)));
+    section.append(createValueRow("Waist measurement", weight?.waist == null ? "No waist entered" : String(weight.waist)));
   }
 
   historyWeightSection?.append(section);
+}
+
+function createMeasurementField(id, labelCopy, dataKey, value) {
+  const group = document.createElement("div");
+  const label = document.createElement("label");
+  const input = document.createElement("input");
+  group.className = "history-field-stack";
+  label.className = "field-label";
+  label.setAttribute("for", id);
+  setText(label, labelCopy);
+  input.id = id;
+  input.className = "text-field";
+  input.type = "number";
+  input.inputMode = "decimal";
+  input.step = "0.1";
+  input.min = "0";
+  input.dataset[dataKey] = "true";
+  input.value = value == null ? "" : String(value);
+  group.append(label, input);
+  return group;
 }
 
 function renderHistoryMeals(meals, isEditable) {
@@ -1461,15 +1497,15 @@ function renderHistoryMealCard(meal, isEditable) {
     body?.append(
       createTextareaField(`history-${slot}-plan`, "Plan", "historyMealPlan", meal.plannedText || ""),
       createMealStateControl(meal),
-      createMetricControl(`history-${slot}-hungry`, "Ate when hungry?", meal.ateWhenHungry),
-      createMetricControl(`history-${slot}-enough`, "Stopped at enough?", meal.stoppedAtEnough),
+      createMetricControl(`history-${slot}-hungry`, "Hunger Level", meal.ateWhenHungry),
+      createMetricControl(`history-${slot}-enough`, "Satiety Level", meal.stoppedAtEnough),
     );
   } else {
     body?.append(
       createValueRow("Plan", meal.plannedText || HISTORY_COPY.noPlan),
       createValueRow("Status", mealStatusLabel(meal.logState)),
-      createValueRow("Ate when hungry?", metricLabel(meal.ateWhenHungry)),
-      createValueRow("Stopped at enough?", metricLabel(meal.stoppedAtEnough)),
+      createValueRow("Hunger Level", metricLabel(meal.ateWhenHungry)),
+      createValueRow("Satiety Level", metricLabel(meal.stoppedAtEnough)),
     );
   }
 
@@ -1508,23 +1544,27 @@ function createMealStateControl(meal) {
 function createMetricControl(name, legendCopy, value) {
   const fieldset = document.createElement("fieldset");
   const legend = document.createElement("legend");
-  fieldset.className = "metric-group";
+  const label = document.createElement("label");
+  const input = document.createElement("input");
+  const output = document.createElement("output");
+  const scaleLabels = document.createElement("p");
+  fieldset.className = "metric-group meal-scale-group";
   setText(legend, legendCopy);
-  fieldset.append(legend);
 
-  for (const [answerValue, copy] of [
-    [MEAL_ANSWERS.yes, "Yes"],
-    [MEAL_ANSWERS.no, "No"],
-  ]) {
-    const label = document.createElement("label");
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = name;
-    input.value = answerValue;
-    input.checked = value === answerValue;
-    label.append(input, document.createTextNode(` ${copy}`));
-    fieldset.append(label);
-  }
+  label.className = "scale-field";
+  input.type = "range";
+  input.name = name;
+  input.min = "0";
+  input.max = "4";
+  input.step = "1";
+  input.dataset.mealLevel = "true";
+  output.dataset.mealLevelOutput = "true";
+  scaleLabels.className = "scale-labels";
+  setText(scaleLabels, mealScaleCopy());
+
+  label.append(input, output);
+  fieldset.append(legend, label, scaleLabels);
+  setMetricInputValue(input, value);
 
   return fieldset;
 }
@@ -1566,18 +1606,11 @@ function renderHistoryAnswerCard(answer, isEditable) {
       body?.append(createHistoryChipGroup(answer.selectedChips || [], true));
     }
 
-    if (answer.supportsDetail) {
-      body?.append(createTextareaField(`${textID}-detail`, "Optional detail", "historyAnswerDetail", answer.detail || ""));
-    }
   } else {
     body?.append(createValueRow("Answer", answer.text || HISTORY_COPY.noReflection));
 
     if (answer.selectedChips?.length) {
       body?.append(createValueRow("Context", answer.selectedChips.map((chip) => chip.label).join(", ")));
-    }
-
-    if (answer.detail) {
-      body?.append(createValueRow("Detail", answer.detail));
     }
   }
 
@@ -1685,15 +1718,7 @@ function focusHistoryDetail() {
 }
 
 function metricLabel(value) {
-  if (value === MEAL_ANSWERS.yes) {
-    return "Yes";
-  }
-
-  if (value === MEAL_ANSWERS.no) {
-    return "No";
-  }
-
-  return "Not logged";
+  return mealLevelLabel(value);
 }
 
 function mealLabel(slot) {
@@ -1708,7 +1733,9 @@ function mealLabel(slot) {
 async function saveTodayWeight() {
   refreshCurrentDayIDs();
   const value = weightInput?.value || "";
+  const waist = waistInput?.value || "";
   const result = await saveWeight(todayDayID, value, {
+    waist,
     confirmLargeChange: pendingWeightConfirmation?.dayID === todayDayID && pendingWeightConfirmation?.value === value,
   });
 
@@ -1720,13 +1747,13 @@ async function saveTodayWeight() {
     }
 
     pendingWeightConfirmation = null;
-    setText(weightMessage, result.status === "Invalid" ? "Enter a positive weight value before saving." : "Weight could not be saved. Try again.");
+    setText(weightMessage, result.status === "Invalid" ? "Enter a positive weight or waist value before saving." : "Measurements could not be saved. Try again.");
     return;
   }
 
   pendingWeightConfirmation = null;
   renderTodayState(result);
-  setText(weightMessage, "Weight saved for today.");
+  setText(weightMessage, "Measurements saved for today.");
 }
 
 async function saveMealFromForm(form) {
@@ -1737,8 +1764,8 @@ async function saveMealFromForm(form) {
   const ateWhenHungry = selectedMetricValue(form, `${slot}-hungry`);
   const stoppedAtEnough = selectedMetricValue(form, `${slot}-enough`);
 
-  if (!ateWhenHungry || !stoppedAtEnough) {
-    setText(message, "Choose Yes or No for both answers before saving.");
+  if (!isMealLevelAnswered(ateWhenHungry) || !isMealLevelAnswered(stoppedAtEnough)) {
+    setText(message, "Choose a Hunger Level and Satiety Level before saving.");
     return;
   }
 
@@ -1804,13 +1831,54 @@ function renderTodayState(state) {
     weightInput.value = state.weight?.value == null ? "" : String(state.weight.value);
   }
 
-  setText(weightMessage, state.weight?.value == null ? "No weight entered today." : "Weight saved for today.");
+  if (waistInput) {
+    waistInput.value = state.weight?.waist == null ? "" : String(state.weight.waist);
+  }
+
+  renderTodaySupport(state.supportNote);
+  setText(weightMessage, measurementsSavedMessage(state.weight));
 
   for (const meal of state.meals) {
     renderMeal(meal);
   }
 
   markTodayFocalState(state);
+}
+
+function renderTodaySupport(supportNote) {
+  if (!supportNote?.text) {
+    setText(todaySupportText, "No support note saved yet.");
+    setText(todaySupportSource, "");
+    if (todaySupportSource) {
+      todaySupportSource.hidden = true;
+    }
+    return;
+  }
+
+  setText(todaySupportText, supportNote.text);
+  setText(todaySupportSource, `From ${supportNote.dayID} journal`);
+  if (todaySupportSource) {
+    todaySupportSource.hidden = false;
+  }
+}
+
+function measurementsSavedMessage(weight) {
+  const hasWeight = weight?.value != null;
+  const hasWaist = weight?.waist != null;
+
+  if (hasWeight && hasWaist) {
+    return "Weight and waist saved for today.";
+  }
+
+  if (hasWeight) {
+    return "Weight saved for today.";
+  }
+
+  if (hasWaist) {
+    return "Waist saved for today.";
+  }
+
+  return "No measurements entered today.";
 }
 
 function renderJournalState(state) {
@@ -1867,7 +1935,6 @@ function renderJournalPromptCard(prompt, answer = null) {
   const fragment = journalPromptTemplate?.content?.firstElementChild?.cloneNode(true);
   const card = fragment || document.createElement("article");
   const textID = `journal-${prompt.id}-answer`;
-  const detailID = `journal-${prompt.id}-detail`;
   const textArea = card.querySelector("[data-journal-answer-text]");
   const label = card.querySelector("[data-journal-prompt-label]");
   const contextList = card.querySelector("[data-journal-context-list]");
@@ -1875,8 +1942,6 @@ function renderJournalPromptCard(prompt, answer = null) {
   const contextItems = card.querySelector("[data-journal-context-items]");
   const chipGroup = card.querySelector("[data-journal-chip-group]");
   const chipList = card.querySelector("[data-journal-chip-list]");
-  const detailLabel = card.querySelector("[data-journal-detail-label]");
-  const detailText = card.querySelector("[data-journal-detail-text]");
   const stateNode = card.querySelector("[data-breakthrough-state]");
   const button = card.querySelector("[data-toggle-breakthrough]");
   const breakthroughState = answer?.breakthroughState || BREAKTHROUGH_STATES.none;
@@ -1884,7 +1949,7 @@ function renderJournalPromptCard(prompt, answer = null) {
   card.dataset.promptId = prompt.id;
   card.dataset.answerId = answer?.id || "";
   card.dataset.breakthroughState = breakthroughState;
-  setText(label, prompt.text);
+  setText(label, journalPromptLabel(prompt));
   renderPromptContext(contextList, contextHeading, contextItems, prompt);
 
   if (label) {
@@ -1901,14 +1966,6 @@ function renderJournalPromptCard(prompt, answer = null) {
     renderJournalChips(chipList, answer?.selectedChips || []);
   }
 
-  if (prompt.supportsDetail) {
-    detailLabel.hidden = false;
-    detailText.hidden = false;
-    detailLabel.setAttribute("for", detailID);
-    detailText.id = detailID;
-    detailText.value = answer?.detail || "";
-  }
-
   if (breakthroughState === BREAKTHROUGH_STATES.marked) {
     stateNode.hidden = false;
     setText(stateNode, "Marked as breakthrough");
@@ -1919,6 +1976,12 @@ function renderJournalPromptCard(prompt, answer = null) {
   }
 
   return card;
+}
+
+function journalPromptLabel(prompt) {
+  return prompt.id === "baseline-tomorrow"
+    ? `${prompt.text} (Note: This will display on the journal tab tomorrow.)`
+    : prompt.text;
 }
 
 function renderPromptContext(contextList, contextHeading, contextItems, prompt) {
@@ -2072,14 +2135,52 @@ function refreshCurrentDayIDs() {
 }
 
 function selectedMetricValue(form, name) {
+  const range = form?.querySelector(`input[type="range"][name="${name}"][data-meal-level]`);
+
+  if (range) {
+    const value = normalizeMealLevel(range.value);
+    return range.dataset.metricAnswered === "true" && isMealLevelAnswered(value) ? value : null;
+  }
+
   const value = form?.querySelector(`[name="${name}"]:checked`)?.value;
-  return value === MEAL_ANSWERS.yes || value === MEAL_ANSWERS.no ? value : null;
+  const normalized = normalizeMealLevel(value);
+  return isMealLevelAnswered(normalized) ? normalized : null;
 }
 
 function setMetricValue(form, name, value) {
+  const range = form?.querySelector(`input[type="range"][name="${name}"][data-meal-level]`);
+
+  if (range) {
+    setMetricInputValue(range, value);
+    return;
+  }
+
   form?.querySelectorAll(`[name="${name}"]`).forEach((input) => {
-    input.checked = input.value === value;
+    input.checked = normalizeMealLevel(input.value) === normalizeMealLevel(value);
   });
+}
+
+function setMetricInputValue(input, value) {
+  const normalized = normalizeMealLevel(value);
+  const answered = isMealLevelAnswered(normalized);
+  input.value = answered ? String(normalized) : "2";
+  input.dataset.metricAnswered = String(answered);
+  updateMealLevelOutput(input);
+}
+
+function updateMealLevelOutput(input) {
+  const output = input.closest(".metric-group")?.querySelector("[data-meal-level-output]");
+  const value = input.dataset.metricAnswered === "true" ? normalizeMealLevel(input.value) : MEAL_ANSWERS.unanswered;
+  setText(output, value === MEAL_ANSWERS.unanswered ? "Not selected" : mealLevelLabel(value));
+}
+
+function markMealLevelAnswered(input) {
+  input.dataset.metricAnswered = "true";
+  updateMealLevelOutput(input);
+}
+
+function mealScaleCopy() {
+  return MEAL_LEVELS.map((level) => `${level.value} ${level.descriptor}`).join(" | ");
 }
 
 function setPlanFormDisabled(disabled) {
@@ -2129,10 +2230,11 @@ function replaceChildren(node, ...children) {
 }
 
 function markTodayFocalState(state) {
-  document.querySelector(".tracking-panel")?.classList.toggle("is-focal", state.weight?.value == null);
+  const hasMeasurements = state.weight?.value != null || state.weight?.waist != null;
+  document.querySelector(".tracking-panel")?.classList.toggle("is-focal", !hasMeasurements);
 
   let focalMealSlot = null;
-  if (state.weight?.value != null) {
+  if (hasMeasurements) {
     focalMealSlot = state.meals.find((meal) => meal.logState === MEAL_STATES.notLogged)?.slot || null;
   }
 

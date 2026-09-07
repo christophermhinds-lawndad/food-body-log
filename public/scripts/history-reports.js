@@ -1,6 +1,5 @@
 import { getLocalDayID, isEditableDay } from "./day-policy.js";
 import {
-  MEAL_ANSWERS,
   MEAL_SLOTS,
   MEAL_STATES,
   applyLoggedMeal,
@@ -8,11 +7,15 @@ import {
   applyUnskippedMeal,
   createDefaultMeal,
   getSlot,
+  isMealLevelAnswered,
+  mealLevelLabel,
   mealID,
+  normalizeMealLevel,
   normalizePlannedText,
+  normalizeWaistValue,
   normalizeWeightValue,
-} from "./tracking-model.js?v=3";
-import { BREAKTHROUGH_STATES, JOURNAL_PROMPTS, createJournalAnswerRecord } from "./journal-model.js?v=2";
+} from "./tracking-model.js?v=4";
+import { BREAKTHROUGH_STATES, JOURNAL_PROMPTS, createJournalAnswerRecord } from "./journal-model.js?v=3";
 import { openAppDb } from "./storage.js";
 
 const DAYS_STORE = "days";
@@ -129,11 +132,12 @@ export const REPORTS_COPY = Object.freeze({
   weightConsiderMore: "Weight notice: Saved entries are lower outside the recent comparison range. These numbers are for observation only; no action is required here.",
   weightStable: "Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.",
   mealHeading: "Meal metrics",
-  hungryLabel: "Ate when hungry",
-  enoughLabel: "Stopped at enough",
-  mealDenominator: "{yesCount} Yes out of {denominator} logged non-skipped meals.",
-  mealNoData: "No logged meals for this period.",
-  mealInsufficient: "Not enough logged data yet. Logged non-skipped meals will count here.",
+  mealSevenDays: "Trailing 7 days",
+  hungryLabel: "Hunger Level",
+  enoughLabel: "Satiety Level",
+  mealDenominator: "Based on {denominator} logged meal level entry/entries.",
+  mealNoData: "No logged meal levels for this period.",
+  mealInsufficient: "Not enough logged data yet. Logged meal levels will count here.",
 });
 
 export async function getHistoryState(options = {}) {
@@ -211,15 +215,16 @@ export async function saveHistoryDay(dayID, draft = {}, options = {}) {
 
     const existingWeight = await getRecord(db, WEIGHTS_STORE, dayID);
     const requestedWeight = hasOwn(draft, "weight") ? normalizeWeightValue(draft.weight?.value) : null;
+    const requestedWaist = hasOwn(draft, "weight") ? normalizeWaistValue(draft.weight?.waist) : null;
 
-    if (hasOwn(draft, "weight") && requestedWeight == null) {
+    if (hasOwn(draft, "weight") && requestedWeight == null && requestedWaist == null) {
       return historyError(db, dayID, "Invalid", {
-        code: "invalid-weight",
+        code: "invalid-measurements",
         dayID,
       }, options);
     }
 
-    if (hasOwn(draft, "weight")) {
+    if (hasOwn(draft, "weight") && requestedWeight != null) {
       const priorWeight = await getPriorWeight(db, dayID);
       const difference = priorWeight?.value == null ? 0 : Math.abs(requestedWeight - priorWeight.value);
 
@@ -241,7 +246,7 @@ export async function saveHistoryDay(dayID, draft = {}, options = {}) {
       }
     }
 
-    const updates = await buildHistoryUpdates(db, dayID, draft, options, existingWeight, requestedWeight);
+    const updates = await buildHistoryUpdates(db, dayID, draft, options, existingWeight, requestedWeight, requestedWaist);
 
     try {
       await putUpdates(db, updates);
@@ -331,20 +336,24 @@ export function summarizeWeightChange(weights, options = {}) {
 export function summarizeMealMetric(meals, metricName, options = {}) {
   const usableMeals = filterRecordsInTrailingWindow(meals, options.windowDays || REPORT_MEAL_WINDOW_DAYS, options)
     .filter((meal) => meal?.logState === MEAL_STATES.logged)
-    .filter((meal) => meal?.[metricName] === MEAL_ANSWERS.yes || meal?.[metricName] === MEAL_ANSWERS.no);
-  const yesCount = usableMeals.filter((meal) => meal[metricName] === MEAL_ANSWERS.yes).length;
+    .map((meal) => normalizeMealLevel(meal?.[metricName]))
+    .filter(isMealLevelAnswered);
   const denominator = usableMeals.length;
-  const state = denominator === 0 ? "NoData" : (denominator === 1 ? "Insufficient" : "Ready");
+  const average = denominator > 0
+    ? roundOneDecimal(usableMeals.reduce((sum, value) => sum + value, 0) / denominator)
+    : null;
+  const state = denominator === 0 ? "NoData" : "Ready";
 
   return {
+    kind: "mealLevel",
     metricName,
-    label: metricName === "stoppedAtEnough" ? "Stopped at enough" : "Ate when hungry",
+    label: metricName === "stoppedAtEnough" ? REPORTS_COPY.enoughLabel : REPORTS_COPY.hungryLabel,
     windowDays: options.windowDays || REPORT_MEAL_WINDOW_DAYS,
     periodLabel: `Trailing ${options.windowDays || REPORT_MEAL_WINDOW_DAYS} days`,
     state,
-    yesCount,
     denominator,
-    percentage: state === "Ready" ? Math.round((yesCount / denominator) * 100) : null,
+    average,
+    formattedAverage: formatWeightAverage(average),
   };
 }
 
@@ -414,7 +423,7 @@ async function historyError(db, dayID, status, error, options = {}) {
   };
 }
 
-async function buildHistoryUpdates(db, dayID, draft, options, existingWeight, requestedWeight) {
+async function buildHistoryUpdates(db, dayID, draft, options, existingWeight, requestedWeight, requestedWaist) {
   const updates = [];
 
   if (hasOwn(draft, "meals")) {
@@ -438,6 +447,7 @@ async function buildHistoryUpdates(db, dayID, draft, options, existingWeight, re
         ...(existingWeight || {}),
         dayID,
         value: requestedWeight,
+        waist: requestedWaist,
         updatedAt: nowIso(options),
       },
     });
@@ -529,7 +539,7 @@ function summarizeHistoryDay(dayID, records, options = {}) {
     editStatus: editStatusFor(dayID, options),
     content: {
       hasMeals: (records.meals || []).some(hasSavedMealContent),
-      hasWeight: normalizeWeightValue(records.weight?.value) != null,
+      hasWeight: normalizeWeightValue(records.weight?.value) != null || normalizeWaistValue(records.weight?.waist) != null,
       hasReflection: answers.some(hasSavedAnswerContent),
       hasBreakthroughs: answers.some((answer) => answer.breakthroughState
         && answer.breakthroughState !== BREAKTHROUGH_STATES.none),
@@ -738,7 +748,7 @@ function getPromptSnapshot(promptID) {
       id: promptID,
       text: `History note: ${promptID}`,
       supportsChips: true,
-      supportsDetail: true,
+      supportsDetail: false,
     };
 }
 

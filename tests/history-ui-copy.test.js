@@ -64,11 +64,11 @@ const requiredReportsCopy = [
   "Weight notice: Saved entries are lower outside the recent comparison range. These numbers are for observation only; no action is required here.",
   "Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.",
   "Meal metrics",
-  "Ate when hungry",
-  "Stopped at enough",
-  "{yesCount} Yes out of {denominator} logged non-skipped meals.",
-  "No logged meals for this period.",
-  "Not enough logged data yet. Logged non-skipped meals will count here.",
+  "Hunger Level",
+  "Satiety Level",
+  "Based on {denominator} logged meal level entry/entries.",
+  "No logged meal levels for this period.",
+  "Not enough logged data yet. Logged meal levels will count here.",
 ];
 
 const forbiddenSourcePatterns = [
@@ -119,8 +119,8 @@ test("static guard tracks non-mutating browse and prior-day weight confirmation 
 test("copy guard scopes forbidden checks to the History Reports repository", () => {
   assert.match(historyReportsSource, /from "\.\/storage\.js"/);
   assert.match(historyReportsSource, /from "\.\/day-policy\.js"/);
-  assert.match(historyReportsSource, /from "\.\/tracking-model\.js\?v=3"/);
-  assert.match(historyReportsSource, /from "\.\/journal-model\.js\?v=2"/);
+  assert.match(historyReportsSource, /from "\.\/tracking-model\.js\?v=4"/);
+  assert.match(historyReportsSource, /from "\.\/journal-model\.js\?v=3"/);
   assert.doesNotMatch(historyReportsSource, /\.innerHTML\s*=|insertAdjacentHTML\s*\(|outerHTML\s*=/);
 });
 
@@ -191,8 +191,9 @@ test("history dynamic rendering uses text-safe sinks and form values instead of 
 
 test("history draft serialization omits blank weight when no weight exists", () => {
   assert.match(historyControllerSlice(), /const weightValue = historyDetail\?\.querySelector\("\[data-history-weight-input\]"\)\?\.value\?\.trim\(\) \|\| "";/);
-  assert.match(historyControllerSlice(), /if \(weightValue !== "" \|\| currentHistoryDayState\?\.weight\?\.value != null\) \{/);
-  assert.match(historyControllerSlice(), /draft\.weight = \{ value: weightValue \};/);
+  assert.match(historyControllerSlice(), /const waistValue = historyDetail\?\.querySelector\("\[data-history-waist-input\]"\)\?\.value\?\.trim\(\) \|\| "";/);
+  assert.match(historyControllerSlice(), /if \(weightValue !== "" \|\| waistValue !== "" \|\| currentHistoryDayState\?\.weight\?\.value != null \|\| currentHistoryDayState\?\.weight\?\.waist != null\) \{/);
+  assert.match(historyControllerSlice(), /draft\.weight = \{[\s\S]*value: weightValue,[\s\S]*waist: waistValue,[\s\S]*\};/);
 });
 
 test("history styles provide required mobile-safe selectors and wrapping backstops", () => {
@@ -254,8 +255,8 @@ test("reports shell exposes fixed numeric groups and tile template", () => {
     "Previous 7 day average",
     "Trailing 30 days",
     "Trailing 90 days",
-    "Ate when hungry",
-    "Stopped at enough",
+    "Hunger Level",
+    "Satiety Level",
   ]) {
     assert.match(html, new RegExp(escapeRegExp(expected)), `missing Reports shell artifact ${expected}`);
   }
@@ -334,8 +335,8 @@ test("history reports and read-only states are not color-only", () => {
     "Editable",
     "No weight data for this period.",
     "Not Enough Data Yet",
-    "No logged meals for this period.",
-    "Not enough logged data yet. Logged non-skipped meals will count here.",
+    "No logged meal levels for this period.",
+    "Not enough logged data yet. Logged meal levels will count here.",
   ]) {
     assert.match(`${html}\n${historyReportsSource}`, new RegExp(escapeRegExp(statusText)), `missing visible status text ${statusText}`);
   }

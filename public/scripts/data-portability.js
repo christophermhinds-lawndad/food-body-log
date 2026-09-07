@@ -1,5 +1,5 @@
 import { openAppDb } from "./storage.js";
-import { JOURNAL_CHIPS, JOURNAL_PROMPTS, OUTSIDE_PLAN_PROMPT_ID } from "./journal-model.js?v=2";
+import { JOURNAL_CHIPS, JOURNAL_PROMPTS, OUTSIDE_PLAN_PROMPT_ID } from "./journal-model.js?v=3";
 
 const APP_ID = "food-body-log";
 const EXPORT_VERSION = 1;
@@ -19,7 +19,7 @@ const STORE_KEY_PATHS = Object.freeze({
 const NON_PORTABLE_SETTINGS_KEYS = Object.freeze(["setup-status"]);
 const MEAL_SLOTS = Object.freeze(["breakfast", "lunch", "dinner", "snack"]);
 const MEAL_STATES = Object.freeze(["notLogged", "logged", "skipped"]);
-const MEAL_ANSWERS = Object.freeze(["yes", "no", "unanswered"]);
+const MEAL_ANSWERS = Object.freeze(["yes", "no", "unanswered", 0, 1, 2, 3, 4]);
 const BREAKTHROUGH_STATES = Object.freeze(["none", "marked", "dropped"]);
 const JOURNAL_PROMPT_SNAPSHOTS = Object.freeze([
   Object.freeze({
@@ -45,7 +45,7 @@ const JOURNAL_PROMPT_SNAPSHOTS = Object.freeze([
     id: "outside-plan-context",
     text: "Context Tiles",
     supportsChips: true,
-    supportsDetail: true,
+    supportsDetail: false,
   }),
 ]);
 const JOURNAL_PROMPT_BY_ID = new Map(JOURNAL_PROMPT_SNAPSHOTS.map((prompt) => [prompt.id, prompt]));
@@ -539,13 +539,16 @@ function normalizeMealRecord(record) {
     return { valid: false, reason: "invalid-meal-slot" };
   }
 
+  const ateWhenHungry = normalizePortableMealLevel(record.ateWhenHungry);
+  const stoppedAtEnough = normalizePortableMealLevel(record.stoppedAtEnough);
+
   if (!MEAL_STATES.includes(record.logState)
-    || !MEAL_ANSWERS.includes(record.ateWhenHungry)
-    || !MEAL_ANSWERS.includes(record.stoppedAtEnough)) {
+    || ateWhenHungry === null
+    || stoppedAtEnough === null) {
     return { valid: false, reason: "invalid-meal-state" };
   }
 
-  if (record.logState === "logged" && (record.ateWhenHungry === "unanswered" || record.stoppedAtEnough === "unanswered")) {
+  if (record.logState === "logged" && (ateWhenHungry === "unanswered" || stoppedAtEnough === "unanswered")) {
     return { valid: false, reason: "missing-logged-answer" };
   }
 
@@ -553,11 +556,23 @@ function normalizeMealRecord(record) {
     return { valid: false, reason: "invalid-meal-text" };
   }
 
-  return { valid: true, record: structuredClone(record) };
+  return {
+    valid: true,
+    record: {
+      ...structuredClone(record),
+      ateWhenHungry,
+      stoppedAtEnough,
+    },
+  };
 }
 
 function normalizeWeightRecord(record) {
-  if (!isDayID(record.dayID) || !Number.isFinite(record.value) || record.value <= 0) {
+  const hasWeight = Number.isFinite(record.value) && record.value > 0;
+  const hasWaist = record.waist == null || record.waist === ""
+    ? false
+    : Number.isFinite(record.waist) && record.waist > 0;
+
+  if (!isDayID(record.dayID) || (!hasWeight && !hasWaist)) {
     return { valid: false, reason: "invalid-weight" };
   }
 
@@ -581,9 +596,7 @@ function normalizeJournalAnswerRecord(record) {
     return { valid: false, reason: "invalid-answer-shape" };
   }
 
-  if (record.promptText !== prompt.text
-    || record.supportsChips !== prompt.supportsChips
-    || record.supportsDetail !== prompt.supportsDetail) {
+  if (!isCompatiblePromptSnapshot(record, prompt)) {
     return { valid: false, reason: "invalid-answer-prompt" };
   }
 
@@ -601,6 +614,41 @@ function normalizeJournalAnswerRecord(record) {
   }
 
   return { valid: true, record: structuredClone(record) };
+}
+
+function normalizePortableMealLevel(value) {
+  if (MEAL_ANSWERS.includes(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && /^[0-4]$/.test(value.trim())) {
+    return Number.parseInt(value.trim(), 10);
+  }
+
+  return null;
+}
+
+function isCompatiblePromptSnapshot(record, prompt) {
+  if (record.promptText === prompt.text
+    && record.supportsChips === prompt.supportsChips
+    && record.supportsDetail === prompt.supportsDetail) {
+    return true;
+  }
+
+  if (record.promptText === prompt.text
+    && record.supportsChips === prompt.supportsChips
+    && record.supportsDetail === true
+    && prompt.supportsDetail === false) {
+    return true;
+  }
+
+  return record.supportsChips === prompt.supportsChips
+    && (record.supportsDetail === true || record.supportsDetail === prompt.supportsDetail)
+    && isLegacyPromptText(record.promptID, record.promptText);
+}
+
+function isLegacyPromptText(promptID, promptText) {
+  return promptID === "baseline-tomorrow" && promptText === "What would support me tomorrow?";
 }
 
 function restoredCounts(data) {

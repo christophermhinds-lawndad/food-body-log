@@ -27,10 +27,10 @@ const journalRequiredCopy = [
   "What was happening when I ate when I was not hungry?",
   "What was happening when I ate past enough?",
   "What might I try differently next time?",
-  "Nothing extra to reflect on from today's meal answers. You can still write anything that feels useful.",
-  "Not all meals are logged yet. That is okay; only logged non-skipped No answers add extra prompts.",
+  "Nothing extra to reflect on from today's meal levels. You can still write anything that feels useful.",
+  "Not all meals are logged yet. That is okay; only logged low-hunger or high-satiety meals add extra prompts.",
   "Optional context",
-  "Optional detail",
+  "(Note: This will display on the journal tab tomorrow.)",
   "Save reflection",
   "Mark as breakthrough",
   "Remove breakthrough",
@@ -95,7 +95,7 @@ test("history markup starts with saved breakthroughs before collapsed history ac
 
 test("journal controller imports repository and wires load save breakthrough actions", () => {
   assert.match(appSource, /import \{ JOURNAL_CHIPS/);
-  assert.match(appSource, /from "\.\/journal-model\.js\?v=2"/);
+  assert.match(appSource, /from "\.\/journal-model\.js\?v=3"/);
   assert.match(appSource, /getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough/);
   assert.match(appSource, /function updateJournalPromptsForOutsidePlanChoice\(\)/);
   assert.match(appSource, /OUTSIDE_PLAN_PROMPT_ID/);

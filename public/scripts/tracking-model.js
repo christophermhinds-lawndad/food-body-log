@@ -17,6 +17,16 @@ export const MEAL_ANSWERS = Object.freeze({
   unanswered: "unanswered",
 });
 
+export const MEAL_LEVELS = Object.freeze([
+  Object.freeze({ value: 0, descriptor: "None" }),
+  Object.freeze({ value: 1, descriptor: "Neutral" }),
+  Object.freeze({ value: 2, descriptor: "Moderate" }),
+  Object.freeze({ value: 3, descriptor: "Distracting" }),
+  Object.freeze({ value: 4, descriptor: "Uncomfortable" }),
+]);
+
+const MEAL_LEVEL_BY_VALUE = new Map(MEAL_LEVELS.map((level) => [level.value, level]));
+
 export function createDefaultMeal(dayID, slot, options = {}) {
   const slotInfo = getSlot(slot);
   const nowIso = toIso(options.now || new Date());
@@ -63,11 +73,11 @@ export function applyUnskippedMeal(existingMeal, now = new Date()) {
 }
 
 export function applyLoggedMeal(existingMeal, options = {}) {
-  const ateWhenHungry = normalizeAnswer(options.ateWhenHungry);
-  const stoppedAtEnough = normalizeAnswer(options.stoppedAtEnough);
+  const ateWhenHungry = normalizeMealLevel(options.ateWhenHungry);
+  const stoppedAtEnough = normalizeMealLevel(options.stoppedAtEnough);
 
-  if (ateWhenHungry === MEAL_ANSWERS.unanswered || stoppedAtEnough === MEAL_ANSWERS.unanswered) {
-    throw new TypeError("Logged meals require both metric answers.");
+  if (!isMealLevelAnswered(ateWhenHungry) || !isMealLevelAnswered(stoppedAtEnough)) {
+    throw new TypeError("Logged meals require both meal levels.");
   }
 
   const nowIso = toIso(options.now || new Date());
@@ -139,6 +149,55 @@ export function normalizeWeightValue(value) {
   return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : null;
 }
 
+export function normalizeWaistValue(value) {
+  const numericValue = typeof value === "number" ? value : Number.parseFloat(String(value ?? "").trim());
+
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : null;
+}
+
+export function normalizeMealLevel(value) {
+  if (value === MEAL_ANSWERS.yes) {
+    return 3;
+  }
+
+  if (value === MEAL_ANSWERS.no) {
+    return 0;
+  }
+
+  if (value === MEAL_ANSWERS.unanswered || value == null || value === "") {
+    return MEAL_ANSWERS.unanswered;
+  }
+
+  const numericValue = typeof value === "number" ? value : Number.parseInt(String(value).trim(), 10);
+
+  return MEAL_LEVEL_BY_VALUE.has(numericValue) ? numericValue : MEAL_ANSWERS.unanswered;
+}
+
+export function isMealLevelAnswered(value) {
+  return normalizeMealLevel(value) !== MEAL_ANSWERS.unanswered;
+}
+
+export function mealLevelLabel(value) {
+  const normalized = normalizeMealLevel(value);
+
+  if (!isMealLevelAnswered(normalized)) {
+    return "Not logged";
+  }
+
+  const level = MEAL_LEVEL_BY_VALUE.get(normalized);
+  return `${level.value} - ${level.descriptor}`;
+}
+
+export function isLowHungerLevel(value) {
+  const normalized = normalizeMealLevel(value);
+  return isMealLevelAnswered(normalized) && normalized <= 1;
+}
+
+export function isHighSatietyLevel(value) {
+  const normalized = normalizeMealLevel(value);
+  return isMealLevelAnswered(normalized) && normalized >= 4;
+}
+
 export function mealID(dayID, slot) {
   return `${dayID}:${getSlot(slot).id}`;
 }
@@ -152,10 +211,6 @@ export function getSlot(slot) {
   }
 
   return match;
-}
-
-function normalizeAnswer(answer) {
-  return answer === MEAL_ANSWERS.yes || answer === MEAL_ANSWERS.no ? answer : MEAL_ANSWERS.unanswered;
 }
 
 function toIso(dateLike) {

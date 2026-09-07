@@ -50,11 +50,11 @@ const requiredCalmCopy = [
   "Not logged",
   "No plan entered",
   "This slot can stay blank. Add a plan when it helps.",
-  "No weight entered today.",
+  "No measurements entered today.",
   "No weight entered",
   "No weight data for this period.",
-  "No logged meals for this period.",
-  "Not enough logged data yet. Logged non-skipped meals will count here.",
+  "No logged meal levels for this period.",
+  "Not enough logged data yet. Logged meal levels will count here.",
   "Backup could not be read. Choose a Food Body Log JSON backup exported from this app.",
   "This backup format is not supported by this version of Food Body Log.",
   "This backup is missing required local data sections, so nothing was imported.",
@@ -70,7 +70,7 @@ const requiredReportCopy = [
   "These numbers are for observation only; no action is required here.",
   "Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.",
   "Based on {count} weight entry/entries in this period.",
-  "{yesCount} Yes out of {denominator} logged non-skipped meals.",
+  "Based on {denominator} logged meal level entry/entries.",
 ];
 
 test("whole-app runtime copy excludes diet scoring pressure and shame framing", () => {
@@ -134,7 +134,7 @@ test("runtime statuses expose visible text or marker plus text instead of color 
     "Read-only",
     "Editable",
     "No weight data for this period.",
-    "Not enough logged data yet. Logged non-skipped meals will count here.",
+    "Not enough logged data yet. Logged meal levels will count here.",
     "Backup looks ready to import. Non-overlapping dates will be added to local data.",
     "Backup has dates that overlap local data. Check the overwrite box before importing.",
     "Backup could not be read. Choose a Food Body Log JSON backup exported from this app.",

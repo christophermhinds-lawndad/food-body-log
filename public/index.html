@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
     <link rel="stylesheet" href="./styles/app.css">
-    <script type="module" src="./scripts/app.js?v=12"></script>
+    <script type="module" src="./scripts/app.js?v=13"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -24,14 +24,29 @@
         <section class="view-panel today-view" data-view="today">
           <p id="today-date" class="date-heading">Today</p>
           <section class="tracking-panel" aria-labelledby="morning-weight-title">
-            <h2 id="morning-weight-title">Morning weight</h2>
+            <h2 id="morning-weight-title">Weight and waist</h2>
             <form id="weight-form" class="stack-form">
-              <label class="field-label" for="weight-value">Today's weight</label>
-              <input id="weight-value" class="text-field" name="weight" type="number" inputmode="decimal" step="0.1" min="0">
+              <div class="weight-fields">
+                <div class="field-stack">
+                  <label class="field-label" for="weight-value">Today's weight</label>
+                  <input id="weight-value" class="text-field" name="weight" type="number" inputmode="decimal" step="0.1" min="0">
+                </div>
+                <div class="field-stack">
+                  <label class="field-label" for="waist-value">Waist measurement</label>
+                  <input id="waist-value" class="text-field" name="waist" type="number" inputmode="decimal" step="0.1" min="0">
+                  <p class="note">Is today Saturday? Measure your waist!</p>
+                </div>
+              </div>
               <p class="note">Weight is just one data point. It is not a reflection of you.</p>
-              <button class="primary-action compact-action" type="submit">Save weight</button>
-              <p id="weight-message" class="status-message" aria-live="polite">No weight entered today.</p>
+              <button class="primary-action compact-action" type="submit">Save measurements</button>
+              <p id="weight-message" class="status-message" aria-live="polite">No measurements entered today.</p>
             </form>
+          </section>
+
+          <section class="support-panel" aria-labelledby="today-support-title">
+            <h2 id="today-support-title">Support for today</h2>
+            <p id="today-support-text" class="support-text">No support note saved yet.</p>
+            <p id="today-support-source" class="date-heading" hidden></p>
           </section>
 
           <section class="today-meals" aria-labelledby="today-meals-title">
@@ -48,15 +63,21 @@
                 <p class="planned-text" data-planned-text="breakfast">No plan entered</p>
                 <p class="note" data-plan-empty-copy="breakfast">This slot can stay blank. Add a plan when it helps.</p>
                 <form class="meal-log-form" data-meal-form data-slot="breakfast">
-                  <fieldset class="metric-group">
-                    <legend>Ate when hungry?</legend>
-                    <label><input type="radio" name="breakfast-hungry" value="yes"> Yes</label>
-                    <label><input type="radio" name="breakfast-hungry" value="no"> No</label>
+                  <fieldset class="metric-group meal-scale-group">
+                    <legend>Hunger Level</legend>
+                    <label class="scale-field">
+                      <input type="range" name="breakfast-hungry" min="0" max="4" step="1" value="2" data-meal-level>
+                      <output data-meal-level-output>Not selected</output>
+                    </label>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
                   </fieldset>
-                  <fieldset class="metric-group">
-                    <legend>Stopped at enough?</legend>
-                    <label><input type="radio" name="breakfast-enough" value="yes"> Yes</label>
-                    <label><input type="radio" name="breakfast-enough" value="no"> No</label>
+                  <fieldset class="metric-group meal-scale-group">
+                    <legend>Satiety Level</legend>
+                    <label class="scale-field">
+                      <input type="range" name="breakfast-enough" min="0" max="4" step="1" value="2" data-meal-level>
+                      <output data-meal-level-output>Not selected</output>
+                    </label>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
                   </fieldset>
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
@@ -78,15 +99,21 @@
                 <p class="planned-text" data-planned-text="lunch">No plan entered</p>
                 <p class="note" data-plan-empty-copy="lunch">This slot can stay blank. Add a plan when it helps.</p>
                 <form class="meal-log-form" data-meal-form data-slot="lunch">
-                  <fieldset class="metric-group">
-                    <legend>Ate when hungry?</legend>
-                    <label><input type="radio" name="lunch-hungry" value="yes"> Yes</label>
-                    <label><input type="radio" name="lunch-hungry" value="no"> No</label>
+                  <fieldset class="metric-group meal-scale-group">
+                    <legend>Hunger Level</legend>
+                    <label class="scale-field">
+                      <input type="range" name="lunch-hungry" min="0" max="4" step="1" value="2" data-meal-level>
+                      <output data-meal-level-output>Not selected</output>
+                    </label>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
                   </fieldset>
-                  <fieldset class="metric-group">
-                    <legend>Stopped at enough?</legend>
-                    <label><input type="radio" name="lunch-enough" value="yes"> Yes</label>
-                    <label><input type="radio" name="lunch-enough" value="no"> No</label>
+                  <fieldset class="metric-group meal-scale-group">
+                    <legend>Satiety Level</legend>
+                    <label class="scale-field">
+                      <input type="range" name="lunch-enough" min="0" max="4" step="1" value="2" data-meal-level>
+                      <output data-meal-level-output>Not selected</output>
+                    </label>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
                   </fieldset>
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
@@ -108,15 +135,21 @@
                 <p class="planned-text" data-planned-text="dinner">No plan entered</p>
                 <p class="note" data-plan-empty-copy="dinner">This slot can stay blank. Add a plan when it helps.</p>
                 <form class="meal-log-form" data-meal-form data-slot="dinner">
-                  <fieldset class="metric-group">
-                    <legend>Ate when hungry?</legend>
-                    <label><input type="radio" name="dinner-hungry" value="yes"> Yes</label>
-                    <label><input type="radio" name="dinner-hungry" value="no"> No</label>
+                  <fieldset class="metric-group meal-scale-group">
+                    <legend>Hunger Level</legend>
+                    <label class="scale-field">
+                      <input type="range" name="dinner-hungry" min="0" max="4" step="1" value="2" data-meal-level>
+                      <output data-meal-level-output>Not selected</output>
+                    </label>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
                   </fieldset>
-                  <fieldset class="metric-group">
-                    <legend>Stopped at enough?</legend>
-                    <label><input type="radio" name="dinner-enough" value="yes"> Yes</label>
-                    <label><input type="radio" name="dinner-enough" value="no"> No</label>
+                  <fieldset class="metric-group meal-scale-group">
+                    <legend>Satiety Level</legend>
+                    <label class="scale-field">
+                      <input type="range" name="dinner-enough" min="0" max="4" step="1" value="2" data-meal-level>
+                      <output data-meal-level-output>Not selected</output>
+                    </label>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
                   </fieldset>
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
@@ -138,15 +171,21 @@
                 <p class="planned-text" data-planned-text="snack">No plan entered</p>
                 <p class="note" data-plan-empty-copy="snack">This slot can stay blank. Add a plan when it helps.</p>
                 <form class="meal-log-form" data-meal-form data-slot="snack">
-                  <fieldset class="metric-group">
-                    <legend>Ate when hungry?</legend>
-                    <label><input type="radio" name="snack-hungry" value="yes"> Yes</label>
-                    <label><input type="radio" name="snack-hungry" value="no"> No</label>
+                  <fieldset class="metric-group meal-scale-group">
+                    <legend>Hunger Level</legend>
+                    <label class="scale-field">
+                      <input type="range" name="snack-hungry" min="0" max="4" step="1" value="2" data-meal-level>
+                      <output data-meal-level-output>Not selected</output>
+                    </label>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
                   </fieldset>
-                  <fieldset class="metric-group">
-                    <legend>Stopped at enough?</legend>
-                    <label><input type="radio" name="snack-enough" value="yes"> Yes</label>
-                    <label><input type="radio" name="snack-enough" value="no"> No</label>
+                  <fieldset class="metric-group meal-scale-group">
+                    <legend>Satiety Level</legend>
+                    <label class="scale-field">
+                      <input type="range" name="snack-enough" min="0" max="4" step="1" value="2" data-meal-level>
+                      <output data-meal-level-output>Not selected</output>
+                    </label>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
                   </fieldset>
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
@@ -234,17 +273,17 @@
             <h2 id="meal-reports-title">Meal metrics</h2>
             <div id="meal-reports" class="reports-grid" aria-live="polite">
               <article class="report-card" data-report-tile data-report-kind="meal" data-metric-name="ateWhenHungry">
-                <h3 data-report-title>Ate when hungry</h3>
+                <h3 data-report-title>Hunger Level</h3>
                 <p class="report-label" data-report-label>Trailing 7 days</p>
-                <p class="report-value" data-report-value>No logged meals for this period.</p>
-                <p class="report-denominator" data-report-denominator>0 logged non-skipped meals in this period.</p>
+                <p class="report-value" data-report-value>No logged meal levels for this period.</p>
+                <p class="report-denominator" data-report-denominator>Based on 0 logged meal level entries.</p>
                 <p class="report-state" data-report-state></p>
               </article>
               <article class="report-card" data-report-tile data-report-kind="meal" data-metric-name="stoppedAtEnough">
-                <h3 data-report-title>Stopped at enough</h3>
+                <h3 data-report-title>Satiety Level</h3>
                 <p class="report-label" data-report-label>Trailing 7 days</p>
-                <p class="report-value" data-report-value>No logged meals for this period.</p>
-                <p class="report-denominator" data-report-denominator>0 logged non-skipped meals in this period.</p>
+                <p class="report-value" data-report-value>No logged meal levels for this period.</p>
+                <p class="report-denominator" data-report-denominator>Based on 0 logged meal level entries.</p>
                 <p class="report-state" data-report-state></p>
               </article>
             </div>
@@ -291,8 +330,6 @@
                 <legend>Optional context</legend>
                 <div class="journal-chip-list" data-journal-chip-list></div>
               </fieldset>
-              <label class="field-label" data-journal-detail-label hidden>Optional detail</label>
-              <textarea class="text-field journal-textarea" data-journal-detail-text rows="2" hidden></textarea>
               <p class="breakthrough-state" data-breakthrough-state hidden>Marked as breakthrough</p>
               <button class="secondary-action" type="button" data-toggle-breakthrough>Mark as breakthrough</button>
             </article>

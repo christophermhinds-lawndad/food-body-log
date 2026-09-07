@@ -219,6 +219,16 @@ test("tracking model keeps fixed slots and state values distinct", async () => {
   );
   assert.equal(new Set(Object.values(model.MEAL_STATES)).size, 3);
   assert.equal(new Set(Object.values(model.MEAL_ANSWERS)).size, 3);
+  assert.deepEqual(model.MEAL_LEVELS.map((level) => [level.value, level.descriptor]), [
+    [0, "None"],
+    [1, "Neutral"],
+    [2, "Moderate"],
+    [3, "Distracting"],
+    [4, "Uncomfortable"],
+  ]);
+  assert.equal(model.normalizeMealLevel(model.MEAL_ANSWERS.yes), 3);
+  assert.equal(model.normalizeMealLevel(model.MEAL_ANSWERS.no), 0);
+  assert.equal(model.mealLevelLabel(4), "4 - Uncomfortable");
 
   const defaultMeal = model.createDefaultMeal(TODAY_ID, model.MEAL_SLOTS[0]);
   assert.equal(defaultMeal.plannedText, "");
@@ -231,8 +241,8 @@ test("tracking model keeps fixed slots and state values distinct", async () => {
     now: FIXED_NOW,
   });
   assert.equal(loggedMeal.logState, model.MEAL_STATES.logged);
-  assert.equal(loggedMeal.ateWhenHungry, model.MEAL_ANSWERS.yes);
-  assert.equal(loggedMeal.stoppedAtEnough, model.MEAL_ANSWERS.no);
+  assert.equal(loggedMeal.ateWhenHungry, 3);
+  assert.equal(loggedMeal.stoppedAtEnough, 0);
 
   const skippedMeal = model.applySkippedMeal(loggedMeal, FIXED_NOW);
   assert.equal(skippedMeal.logState, model.MEAL_STATES.skipped);
@@ -366,8 +376,8 @@ test("plan saves update supplied slots without resetting sibling log state or an
   assert.equal(meals.breakfast.plannedText, "");
   assert.equal(meals.lunch.plannedText, "Rice bowl");
   assert.equal(meals.lunch.logState, model.MEAL_STATES.logged);
-  assert.equal(meals.lunch.ateWhenHungry, model.MEAL_ANSWERS.no);
-  assert.equal(meals.lunch.stoppedAtEnough, model.MEAL_ANSWERS.yes);
+  assert.equal(meals.lunch.ateWhenHungry, 0);
+  assert.equal(meals.lunch.stoppedAtEnough, 3);
   assert.equal(meals.lunch.updatedAt, beforeMeals.lunch.updatedAt);
   assert.equal(meals.dinner.plannedText, "Soup");
   assert.equal(meals.dinner.updatedAt, beforeMeals.dinner.updatedAt);
@@ -431,8 +441,8 @@ test("saving one meal log updates that slot only and preserves sibling records",
   assert.equal(meals.breakfast.logState, model.MEAL_STATES.notLogged);
   assert.equal(meals.lunch.plannedText, "Rice bowl");
   assert.equal(meals.lunch.logState, model.MEAL_STATES.logged);
-  assert.equal(meals.lunch.ateWhenHungry, model.MEAL_ANSWERS.yes);
-  assert.equal(meals.lunch.stoppedAtEnough, model.MEAL_ANSWERS.no);
+  assert.equal(meals.lunch.ateWhenHungry, 3);
+  assert.equal(meals.lunch.stoppedAtEnough, 0);
   assert.equal(meals.dinner.logState, model.MEAL_STATES.notLogged);
   assert.equal(meals.snack.logState, model.MEAL_STATES.notLogged);
 });
@@ -453,7 +463,7 @@ test("partial non-skipped meal answers return an affected-slot failure without p
       stoppedAtEnough: model.MEAL_ANSWERS.unanswered,
       now: FIXED_NOW,
     }),
-    /require both metric answers/i,
+    /require both meal levels/i,
   );
 
   const partialResult = await repository.saveMealLog(TODAY_ID, "breakfast", {

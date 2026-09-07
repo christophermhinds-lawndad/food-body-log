@@ -1,4 +1,9 @@
-import { MEAL_ANSWERS, MEAL_STATES } from "./tracking-model.js?v=3";
+import {
+  MEAL_ANSWERS,
+  MEAL_STATES,
+  isHighSatietyLevel,
+  isLowHungerLevel,
+} from "./tracking-model.js?v=4";
 
 export const OUTSIDE_PLAN_PROMPT_ID = "outside-plan-check";
 
@@ -20,7 +25,7 @@ export const JOURNAL_PROMPTS = Object.freeze([
     id: "baseline-feeling",
     text: "How was I feeling around food today?",
     supportsChips: true,
-    supportsDetail: true,
+    supportsDetail: false,
   }),
   Object.freeze({
     id: "baseline-helped",
@@ -38,13 +43,13 @@ export const JOURNAL_PROMPTS = Object.freeze([
     id: "deeper-hungry",
     text: "What was happening when I ate when I was not hungry?",
     supportsChips: true,
-    supportsDetail: true,
+    supportsDetail: false,
   }),
   Object.freeze({
     id: "deeper-enough",
     text: "What was happening when I ate past enough?",
     supportsChips: true,
-    supportsDetail: true,
+    supportsDetail: false,
   }),
   Object.freeze({
     id: "deeper-next-time",
@@ -153,8 +158,12 @@ export function createJournalAnswerRecord(dayID, prompt, input = {}, existing = 
 function promptFlagsForMeals(meals) {
   const loggedMeals = (Array.isArray(meals) ? meals : [])
     .filter((meal) => meal?.logState === MEAL_STATES.logged);
-  const hungryNoMeals = loggedMeals.filter((meal) => meal.ateWhenHungry === MEAL_ANSWERS.no).map(mealLabel);
-  const enoughNoMeals = loggedMeals.filter((meal) => meal.stoppedAtEnough === MEAL_ANSWERS.no).map(mealLabel);
+  const hungryNoMeals = loggedMeals
+    .filter((meal) => meal.ateWhenHungry === MEAL_ANSWERS.no || isLowHungerLevel(meal.ateWhenHungry))
+    .map(mealLabel);
+  const enoughNoMeals = loggedMeals
+    .filter((meal) => meal.stoppedAtEnough === MEAL_ANSWERS.no || isHighSatietyLevel(meal.stoppedAtEnough))
+    .map(mealLabel);
 
   return {
     hungryNo: hungryNoMeals.length > 0,
@@ -224,7 +233,7 @@ function getPrompt(prompt) {
       id: "outside-plan-context",
       text: "Context Tiles",
       supportsChips: true,
-      supportsDetail: true,
+      supportsDetail: false,
     },
   ].find((candidate) => candidate.id === promptID);
 

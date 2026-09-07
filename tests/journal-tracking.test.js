@@ -208,7 +208,6 @@ test("journal state returns day meals prompts existing answers and highlighted b
     "baseline-feeling": {
       text: "  I noticed breakfast felt rushed.  ",
       selectedChipIDs: ["rushed"],
-      detail: "  I was between calls.  ",
     },
   }, { now: FIXED_NOW });
   await journalRepository.setAnswerBreakthrough(model.journalAnswerID(DAY_ID, "baseline-feeling"), true, {
@@ -238,7 +237,6 @@ test("saving reflection writes one record per rendered prompt including blanks",
     "deeper-hungry": {
       text: "  I had waited too long. ",
       selectedChipIDs: ["tired", "habit"],
-      detail: " ",
     },
   }, { now: FIXED_NOW });
   const state = await journalRepository.getJournalState(DAY_ID, { now: FIXED_NOW });
@@ -250,7 +248,6 @@ test("saving reflection writes one record per rendered prompt including blanks",
     "baseline-helped",
     "baseline-tomorrow",
     "deeper-hungry",
-    "deeper-enough",
     "deeper-next-time",
   ]);
   assert.deepEqual(state.answers.map((answer) => answer.promptID), state.prompts.map((prompt) => prompt.id));
@@ -275,7 +272,6 @@ test("outside plan yes saves separately and swaps in specific follow-up prompts"
     "outside-plan-context": {
       text: "",
       selectedChipIDs: ["habit"],
-      detail: "Standing in the kitchen.",
     },
   }, { now: FIXED_NOW });
   const state = await journalRepository.getJournalState(DAY_ID, { now: FIXED_NOW });
@@ -294,7 +290,7 @@ test("outside plan yes saves separately and swaps in specific follow-up prompts"
   assert.deepEqual(state.answers.find((answer) => answer.promptID === "outside-plan-context").selectedChips, [
     { id: "habit", label: "Habit" },
   ]);
-  assert.equal(state.answers.find((answer) => answer.promptID === "outside-plan-context").detail, "Standing in the kitchen.");
+  assert.equal(state.answers.find((answer) => answer.promptID === "outside-plan-context").detail, "");
 });
 
 test("remove and drop update breakthrough metadata without deleting the source answer", async () => {
@@ -337,7 +333,6 @@ test("breakthrough list returns marked answers in deterministic newest-first ord
     "baseline-feeling": {
       text: "Older answer",
       selectedChipIDs: ["tired"],
-      detail: "Detail",
     },
   }, { now: new Date("2026-07-17T20:00:00.000Z") });
   await journalRepository.saveReflection(DAY_ID, {
@@ -359,7 +354,7 @@ test("breakthrough list returns marked answers in deterministic newest-first ord
   ]);
   assert.deepEqual(list.breakthroughs[2].selectedChips, [{ id: "tired", label: "Tired" }]);
   assert.equal(list.breakthroughs[2].promptText, "How was I feeling around food today?");
-  assert.equal(list.breakthroughs[2].detail, "Detail");
+  assert.equal(list.breakthroughs[2].detail, "");
 });
 
 test("journal repository returns neutral unavailable results without IndexedDB", async () => {

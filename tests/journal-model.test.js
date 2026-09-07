@@ -95,6 +95,25 @@ test("journal prompts always include baseline prompts and only relevant deeper p
     "deeper-enough",
     "deeper-next-time",
   ]);
+  assert.deepEqual(model.promptsForMeals([
+    meal("breakfast", {
+      logState: MEAL_STATES.logged,
+      ateWhenHungry: 1,
+      stoppedAtEnough: 2,
+    }),
+    meal("dinner", {
+      logState: MEAL_STATES.logged,
+      ateWhenHungry: 3,
+      stoppedAtEnough: 4,
+    }),
+  ]).map((prompt) => prompt.id), [
+    "baseline-feeling",
+    "baseline-helped",
+    "baseline-tomorrow",
+    "deeper-hungry",
+    "deeper-enough",
+    "deeper-next-time",
+  ]);
 });
 
 test("outside plan yes replaces baseline feeling with specific follow-up prompts", async () => {
@@ -184,13 +203,13 @@ test("journal answer records preserve prompt and chip snapshots while accepting 
   assert.equal(selectedRecord.promptID, "baseline-feeling");
   assert.equal(selectedRecord.promptText, "How was I feeling around food today?");
   assert.equal(selectedRecord.supportsChips, true);
-  assert.equal(selectedRecord.supportsDetail, true);
+  assert.equal(selectedRecord.supportsDetail, false);
   assert.equal(selectedRecord.text, "I paused before lunch.");
   assert.deepEqual(selectedRecord.selectedChips, [
     { id: "tired", label: "Tired" },
     { id: "social-pressure", label: "Social pressure" },
   ]);
-  assert.equal(selectedRecord.detail, "Late meeting.");
+  assert.equal(selectedRecord.detail, "");
   assert.equal(selectedRecord.breakthroughState, model.BREAKTHROUGH_STATES.none);
   assert.equal(selectedRecord.breakthroughMarkedAt, null);
   assert.equal(selectedRecord.breakthroughDroppedAt, null);

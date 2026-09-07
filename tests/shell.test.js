@@ -26,7 +26,7 @@ test("shell markup exposes all tabs with Today active by default", () => {
 
 test("shell uses relative app assets and install metadata", () => {
   assert.match(html, /href="\.\/styles\/app\.css"/);
-  assert.match(html, /src="\.\/scripts\/app\.js\?v=12"/);
+  assert.match(html, /src="\.\/scripts\/app\.js\?v=13"/);
   assert.match(html, /type="module"/);
   assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
   assert.match(html, /rel="apple-touch-icon" href="\.\/icons\/apple-touch-icon\.png"/);
@@ -47,21 +47,25 @@ test("settings markup includes install status interaction and local-only copy", 
 });
 
 test("today and plan shell expose the Phase 2 tracer surfaces", () => {
-  for (const label of ["Morning weight", "Today's meals", "Breakfast", "Lunch", "Dinner", "Optional Snack"]) {
+  for (const label of ["Weight and waist", "Today's meals", "Breakfast", "Lunch", "Dinner", "Optional Snack"]) {
     assert.match(html, new RegExp(label), `missing ${label}`);
   }
 
   for (const copy of [
     "Weight is just one data point. It is not a reflection of you.",
-    "Save weight",
-    "No weight entered today.",
+    "Waist measurement",
+    "Is today Saturday? Measure your waist!",
+    "Save measurements",
+    "No measurements entered today.",
+    "Support for today",
+    "No support note saved yet.",
     "Not logged",
     "Logged",
     "Skipped",
     "Log meal",
     "Skip meal",
-    "Ate when hungry?",
-    "Stopped at enough?",
+    "Hunger Level",
+    "Satiety Level",
     "Plan meals",
     "Leave any slot blank if you do not want to plan it.",
     "Save plan",

@@ -174,6 +174,7 @@ p {
 }
 
 .tracking-panel,
+.support-panel,
 .meal-card {
   display: grid;
   gap: 16px;
@@ -181,6 +182,27 @@ p {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface);
+}
+
+.weight-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.field-stack {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.field-stack .note {
+  margin-bottom: 0;
+}
+
+.support-text {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
 }
 
 .tracking-panel.is-focal,
@@ -363,6 +385,40 @@ p {
 .meal-log-form {
   display: grid;
   gap: 16px;
+}
+
+.meal-scale-group {
+  gap: 8px;
+}
+
+.scale-field {
+  display: grid;
+  min-height: 44px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.scale-field input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.scale-field output {
+  min-width: 112px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.scale-labels {
+  margin-bottom: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .button-row {
@@ -990,6 +1046,11 @@ p {
   .reports-section,
   .reports-grid,
   .report-card,
+  .support-panel,
+  .weight-fields,
+  .field-stack,
+  .scale-field,
+  .scale-labels,
   .backup-section,
   .backup-warning,
   .backup-controls,
@@ -1019,6 +1080,8 @@ p {
   .reports-section,
   .reports-grid,
   .report-card,
+  .weight-fields,
+  .scale-field,
   .backup-section,
   .backup-warning,
   .backup-controls,
@@ -1042,6 +1105,8 @@ p {
   .meal-card-header,
   .button-row,
   .segmented-control,
+  .weight-fields,
+  .scale-field,
   .breakthrough-card .button-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

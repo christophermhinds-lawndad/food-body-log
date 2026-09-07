@@ -8,20 +8,24 @@ import {
   getSlot,
   mealID,
   normalizePlannedText,
+  normalizeWaistValue,
   normalizeWeightValue,
   rankPlannedTextSuggestions,
-} from "./tracking-model.js?v=3";
+} from "./tracking-model.js?v=4";
 import { openAppDb } from "./storage.js";
 
 const DAYS_STORE = "days";
 const MEALS_STORE = "meals";
 const WEIGHTS_STORE = "weights";
+const JOURNAL_ANSWERS_STORE = "journalAnswers";
+const SUPPORT_TOMORROW_PROMPT_ID = "baseline-tomorrow";
 const UNAVAILABLE = Object.freeze({
   available: false,
   status: "Unavailable",
   day: null,
   meals: [],
   weight: null,
+  supportNote: null,
 });
 
 export async function getTodayTrackingState(options = {}) {
@@ -65,6 +69,7 @@ export async function savePlan(dayID, plannedTextBySlot, options = {}) {
         day,
         meals: await ensureMealsForDay(db, dayID, options),
         weight: await getWeight(db, dayID),
+        supportNote: await getLatestSupportNote(db, dayID),
         error: {
           code: "plan-save-failed",
           dayID,
@@ -77,6 +82,7 @@ export async function savePlan(dayID, plannedTextBySlot, options = {}) {
       day,
       meals: await ensureMealsForDay(db, dayID, options),
       weight: await getWeight(db, dayID),
+      supportNote: await getLatestSupportNote(db, dayID),
     };
   });
 }
@@ -99,6 +105,7 @@ export async function saveMealLog(dayID, slot, answers = {}) {
           day,
           meals: await ensureMealsForDay(db, dayID, answers),
           weight: await getWeight(db, dayID),
+          supportNote: await getLatestSupportNote(db, dayID),
           error: {
             code: "partial-metric-answers",
             dayID,
@@ -118,6 +125,7 @@ export async function saveMealLog(dayID, slot, answers = {}) {
         day,
         meals: await ensureMealsForDay(db, dayID, answers),
         weight: await getWeight(db, dayID),
+        supportNote: await getLatestSupportNote(db, dayID),
         error: {
           code: "meal-save-failed",
           dayID,
@@ -131,6 +139,7 @@ export async function saveMealLog(dayID, slot, answers = {}) {
       day,
       meals: await ensureMealsForDay(db, dayID, answers),
       weight: await getWeight(db, dayID),
+      supportNote: await getLatestSupportNote(db, dayID),
     };
   });
 }
@@ -150,6 +159,7 @@ export async function skipMeal(dayID, slot, options = {}) {
       day,
       meals: await ensureMealsForDay(db, dayID, options),
       weight: await getWeight(db, dayID),
+      supportNote: await getLatestSupportNote(db, dayID),
     };
   });
 }
@@ -169,14 +179,16 @@ export async function unskipMeal(dayID, slot, options = {}) {
       day,
       meals: await ensureMealsForDay(db, dayID, options),
       weight: await getWeight(db, dayID),
+      supportNote: await getLatestSupportNote(db, dayID),
     };
   });
 }
 
 export async function saveWeight(dayID, value, options = {}) {
   const normalizedWeight = normalizeWeightValue(value);
+  const normalizedWaist = normalizeWaistValue(options.waist);
 
-  if (normalizedWeight == null) {
+  if (normalizedWeight == null && normalizedWaist == null) {
     return {
       ...UNAVAILABLE,
       status: "Invalid",
@@ -186,15 +198,17 @@ export async function saveWeight(dayID, value, options = {}) {
   return withDb(async (db) => {
     const day = await ensureDay(db, dayID, options);
     await ensureMealsForDay(db, dayID, options);
+    const existingWeight = await getWeight(db, dayID);
     const priorWeight = await getPriorWeight(db, dayID);
-    const difference = priorWeight?.value == null ? 0 : Math.abs(normalizedWeight - priorWeight.value);
+    const difference = normalizedWeight == null || priorWeight?.value == null ? 0 : Math.abs(normalizedWeight - priorWeight.value);
 
-    if (difference > 5 && options.confirmLargeChange !== true) {
+    if (normalizedWeight != null && difference > 5 && options.confirmLargeChange !== true) {
       return {
         status: "NeedsConfirmation",
         day,
         meals: await ensureMealsForDay(db, dayID, options),
-        weight: await getWeight(db, dayID),
+        weight: existingWeight,
+        supportNote: await getLatestSupportNote(db, dayID),
         warning: {
           code: "possible-weight-typo",
           dayID,
@@ -207,8 +221,10 @@ export async function saveWeight(dayID, value, options = {}) {
     }
 
     const weight = {
+      ...(existingWeight || {}),
       dayID,
       value: normalizedWeight,
+      waist: normalizedWaist,
       updatedAt: nowIso(options),
     };
     await putRecord(db, WEIGHTS_STORE, weight);
@@ -218,6 +234,7 @@ export async function saveWeight(dayID, value, options = {}) {
       day,
       meals: await ensureMealsForDay(db, dayID, options),
       weight,
+      supportNote: await getLatestSupportNote(db, dayID),
     };
   });
 }
@@ -227,12 +244,14 @@ async function readDayState(dayID, options = {}) {
     const day = await ensureDay(db, dayID, options);
     const meals = await ensureMealsForDay(db, dayID, options);
     const weight = await getWeight(db, dayID);
+    const supportNote = await getLatestSupportNote(db, dayID);
 
     return {
       status: "Ready",
       day,
       meals,
       weight,
+      supportNote,
     };
   });
 }
@@ -394,6 +413,31 @@ function getAllMeals(db) {
     request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
     request.onerror = () => reject(request.error);
   });
+}
+
+function getAllJournalAnswers(db) {
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(JOURNAL_ANSWERS_STORE, "readonly").objectStore(JOURNAL_ANSWERS_STORE).getAll();
+
+    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getLatestSupportNote(db, dayID) {
+  const answers = await getAllJournalAnswers(db);
+  const latest = answers
+    .filter((answer) => answer?.promptID === SUPPORT_TOMORROW_PROMPT_ID)
+    .filter((answer) => answer.dayID < dayID)
+    .filter((answer) => String(answer.text || "").trim())
+    .sort((left, right) => right.dayID.localeCompare(left.dayID) || String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")))[0];
+
+  return latest
+    ? {
+      dayID: latest.dayID,
+      text: String(latest.text || "").trim(),
+    }
+    : null;
 }
 
 function nowIso(options = {}) {

@@ -466,8 +466,8 @@ test("reports expose trailing weight averages and sparse meal metric states", as
 
   assert.deepEqual(noWeight.map((summary) => summary.state), ["NoData", "NoData", "NotEnoughData", "NotEnoughData"]);
   assert.deepEqual(noWeight.map((summary) => summary.display), [true, true, false, false]);
-  assert.equal(oneMeal.state, "Insufficient");
-  assert.equal(oneMeal.percentage, null);
+  assert.equal(oneMeal.state, "Ready");
+  assert.equal(oneMeal.average, 3);
   assert.deepEqual(state.weightAverages.map((summary) => [summary.id, summary.windowDays, summary.state, summary.count, summary.average, summary.display]), [
     ["current7", 7, "Ready", 3, 183.3, true],
     ["previous7", 7, "NoData", 0, null, true],
@@ -480,9 +480,9 @@ test("reports expose trailing weight averages and sparse meal metric states", as
     "Trailing 30 days",
     "Trailing 90 days",
   ]);
-  assert.deepEqual(state.mealMetrics.map((summary) => [summary.metricName, summary.state, summary.yesCount, summary.denominator, summary.percentage]), [
-    ["ateWhenHungry", "Ready", 2, 3, 67],
-    ["stoppedAtEnough", "Ready", 2, 2, 100],
+  assert.deepEqual(state.mealMetrics.map((summary) => [summary.metricName, summary.label, summary.state, summary.denominator, summary.average]), [
+    ["ateWhenHungry", "Hunger Level", "Ready", 3, 2],
+    ["stoppedAtEnough", "Satiety Level", "Ready", 2, 3],
   ]);
   assert.equal(historyReports.formatWeightAverage(182), "182");
   assert.equal(historyReports.formatWeightAverage(183.3), "183.3");
