@@ -1,14 +1,14 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=14";
+import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=15";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
 import { MEAL_ANSWERS, MEAL_LEVELS, MEAL_STATES, isMealLevelAnswered, mealLevelLabel, normalizeMealLevel } from "./tracking-model.js?v=5";
 import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=6";
 import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
 import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=4";
 import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough, getBreakthroughs } from "./journal-tracking.js?v=4";
-import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=5";
+import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=6";
 import { createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText } from "./data-portability.js?v=5";
 
 const appPaths = createAppPaths();
@@ -49,6 +49,9 @@ const reportsStatus = document.querySelector("#reports-status");
 const weightSummaryNotice = document.querySelector("#weight-summary-notice");
 const weightSummaryLines = document.querySelector("#weight-summary-lines");
 const weightReports = document.querySelector("#weight-reports");
+const waistReportStatus = document.querySelector("#waist-report-status");
+const waistChart = document.querySelector("#waist-chart");
+const waistReportSummary = document.querySelector("#waist-report-summary");
 const mealReports = document.querySelector("#meal-reports");
 const reportTileTemplate = document.querySelector("[data-report-tile-template]");
 const historyStatus = document.querySelector("#history-status");
@@ -680,6 +683,7 @@ function renderReportsState(state) {
     setText(reportsStatus, REPORTS_COPY.error);
     renderWeightSummary(null);
     renderWeightReportTiles([]);
+    renderWaistTrend(null);
     renderMealReportTiles([]);
     return;
   }
@@ -687,6 +691,7 @@ function renderReportsState(state) {
   setText(reportsStatus, "");
   renderWeightSummary(state.weightSummary);
   renderWeightReportTiles(state.weightAverages || []);
+  renderWaistTrend(state.waistTrend);
   renderMealReportTiles(state.mealMetrics || []);
 }
 
@@ -718,7 +723,7 @@ function renderWeightReportTiles(weightAverages) {
   for (const summaryID of ["current7", "previous7", "trailing30", "trailing90"]) {
     const tile = weightAverages.find((candidate) => candidate.id === summaryID) || {
       id: summaryID,
-      periodLabel: summaryID === "previous7" ? "Previous 7 day average" : "Current 7 day average",
+      periodLabel: fallbackWeightPeriodLabel(summaryID),
       state: "NoData",
       count: 0,
       average: null,
@@ -777,6 +782,91 @@ function renderMealReportTile(tile) {
   });
 }
 
+function renderWaistTrend(trend) {
+  replaceChildren(waistChart);
+
+  if (!trend || trend.status !== "Ready" || !trend.entries?.length) {
+    setText(waistReportStatus, REPORTS_COPY.waistNoData);
+    setText(waistReportSummary, "");
+    return;
+  }
+
+  setText(waistReportStatus, REPORTS_COPY.waistLabel);
+  setText(waistReportSummary, trend.summaryText);
+  waistChart?.append(createWaistChart(trend));
+}
+
+function createWaistChart(trend) {
+  const namespace = ["http:", "", "www.w3.org", "2000", "svg"].join("/");
+  const svg = document.createElementNS(namespace, "svg");
+  const width = 320;
+  const height = 180;
+  const margins = { top: 18, right: 12, bottom: 42, left: 42 };
+  const plotWidth = width - margins.left - margins.right;
+  const plotHeight = height - margins.top - margins.bottom;
+  const axisMin = Number(trend.axisMin);
+  const axisMax = Number(trend.axisMax);
+  const axisRange = axisMax > axisMin ? axisMax - axisMin : 1;
+  const entries = trend.entries || [];
+  const points = entries.map((entry, index) => {
+    const x = entries.length === 1
+      ? margins.left + plotWidth / 2
+      : margins.left + (plotWidth * index) / (entries.length - 1);
+    const y = margins.top + ((axisMax - entry.value) / axisRange) * plotHeight;
+
+    return { x, y, entry };
+  });
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Waist measurements in inches by date");
+
+  appendSvgLine(svg, namespace, margins.left, margins.top, margins.left, margins.top + plotHeight, "waist-chart-axis");
+  appendSvgLine(svg, namespace, margins.left, margins.top + plotHeight, margins.left + plotWidth, margins.top + plotHeight, "waist-chart-axis");
+  appendSvgText(svg, namespace, margins.left - 8, margins.top + 4, `${formatReportNumber(axisMax)} in`, "waist-chart-axis-label", "end");
+  appendSvgText(svg, namespace, margins.left - 8, margins.top + plotHeight, `${formatReportNumber(axisMin)} in`, "waist-chart-axis-label", "end");
+
+  if (points.length > 1) {
+    const path = document.createElementNS(namespace, "path");
+    path.setAttribute("class", "waist-chart-line");
+    path.setAttribute("d", points.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" "));
+    svg.append(path);
+  }
+
+  for (const point of points) {
+    const circle = document.createElementNS(namespace, "circle");
+    circle.setAttribute("class", "waist-chart-point");
+    circle.setAttribute("cx", String(point.x));
+    circle.setAttribute("cy", String(point.y));
+    circle.setAttribute("r", "4");
+    svg.append(circle);
+    appendSvgText(svg, namespace, point.x, point.y - 8, formatReportNumber(point.entry.value), "waist-chart-value", "middle");
+    appendSvgText(svg, namespace, point.x, margins.top + plotHeight + 18, shortDateLabel(point.entry.dayID), "waist-chart-date", "middle");
+  }
+
+  return svg;
+}
+
+function appendSvgLine(svg, namespace, x1, y1, x2, y2, className) {
+  const line = document.createElementNS(namespace, "line");
+  line.setAttribute("class", className);
+  line.setAttribute("x1", String(x1));
+  line.setAttribute("y1", String(y1));
+  line.setAttribute("x2", String(x2));
+  line.setAttribute("y2", String(y2));
+  svg.append(line);
+}
+
+function appendSvgText(svg, namespace, x, y, copy, className, anchor) {
+  const text = document.createElementNS(namespace, "text");
+  text.setAttribute("class", className);
+  text.setAttribute("x", String(x));
+  text.setAttribute("y", String(y));
+  text.setAttribute("text-anchor", anchor);
+  setText(text, copy);
+  svg.append(text);
+}
+
 function renderReportTile(card, tile) {
   const reportNode = card || reportTileTemplate?.content?.firstElementChild?.cloneNode(true);
 
@@ -794,7 +884,7 @@ function renderReportTile(card, tile) {
 function reportValueText(tile) {
   if (tile.kind === "mealLevel") {
     if (tile.state === "Ready") {
-      return `${tile.formattedAverage || String(tile.average)} / 4`;
+      return tile.qualitativeText || `${tile.formattedAverage || String(tile.average)} / 4`;
     }
 
     return REPORTS_COPY.mealNoData;
@@ -817,11 +907,10 @@ function reportValueText(tile) {
 
 function reportDenominatorText(tile) {
   if (tile.kind === "mealLevel") {
-    const denominator = Number(tile.denominator || 0);
-    const noun = denominator === 1 ? "entry" : "entries";
-    return REPORTS_COPY.mealDenominator
-      .replace("{denominator}", String(denominator))
-      .replace("entry/entries", noun);
+    return tile.averageSummary || REPORTS_COPY.mealDenominator
+      .replace("{average}", "no data")
+      .replace("{denominator}", String(Number(tile.denominator || 0)))
+      .replace("meal/meals", Number(tile.denominator || 0) === 1 ? "meal" : "meals");
   }
 
   if (Object.hasOwn(tile, "average")) {
@@ -833,6 +922,30 @@ function reportDenominatorText(tile) {
   const denominator = Number(tile.denominator || 0);
 
   return denominator === 1 ? "1 logged non-skipped meal in this period." : `${denominator} logged non-skipped meals in this period.`;
+}
+
+function fallbackWeightPeriodLabel(summaryID) {
+  const labels = {
+    current7: REPORTS_COPY.weightSevenDays,
+    previous7: REPORTS_COPY.weightPreviousSevenDays,
+    trailing30: REPORTS_COPY.weightThirtyDays,
+    trailing90: REPORTS_COPY.weightNinetyDays,
+  };
+
+  return labels[summaryID] || REPORTS_COPY.weightSevenDays;
+}
+
+function formatReportNumber(value) {
+  if (value == null || Number.isNaN(Number(value))) {
+    return "";
+  }
+
+  return Number.isInteger(Number(value)) ? String(Number(value)) : Number(value).toFixed(1);
+}
+
+function shortDateLabel(dayID) {
+  const [, month = "", day = ""] = String(dayID || "").split("-");
+  return `${month}/${day}`;
 }
 
 function weightNoticeClass(kind) {

@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
     <link rel="stylesheet" href="./styles/app.css">
-    <script type="module" src="./scripts/app.js?v=14"></script>
+    <script type="module" src="./scripts/app.js?v=15"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -233,7 +233,7 @@
           <p id="reports-status" class="status-message" aria-live="polite">Loading reports...</p>
           <section class="weight-summary" aria-labelledby="weight-summary-title">
             <h2 id="weight-summary-title">Weight summary</h2>
-            <p id="weight-summary-notice" class="weight-summary-notice is-stable" data-weight-summary-notice>Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.</p>
+            <p id="weight-summary-notice" class="weight-summary-notice is-stable" data-weight-summary-notice>You are currently maintaining your weight. Unless you are at your target weight, slight adjustments around hunger, satiety, and meal planning will be necessary to move the needle. Review your statistics and work on optimizing your current habits.</p>
             <div id="weight-summary-lines" class="weight-summary-lines" aria-live="polite"></div>
           </section>
           <section class="reports-section" aria-labelledby="weight-reports-title">
@@ -254,19 +254,27 @@
                 <p class="report-state" data-report-state></p>
               </article>
               <article class="report-card" data-report-tile data-report-kind="weight" data-weight-summary-id="trailing30">
-                <h3 data-report-title>Trailing 30 days</h3>
+                <h3 data-report-title>Average 30 days ago</h3>
                 <p class="report-label" data-report-label>Weight average</p>
                 <p class="report-value" data-report-value>No weight data for this period.</p>
                 <p class="report-denominator" data-report-denominator>Based on 0 weight entries in this period.</p>
                 <p class="report-state" data-report-state></p>
               </article>
               <article class="report-card" data-report-tile data-report-kind="weight" data-weight-summary-id="trailing90">
-                <h3 data-report-title>Trailing 90 days</h3>
+                <h3 data-report-title>Average 90 days ago</h3>
                 <p class="report-label" data-report-label>Weight average</p>
                 <p class="report-value" data-report-value>No weight data for this period.</p>
                 <p class="report-denominator" data-report-denominator>Based on 0 weight entries in this period.</p>
                 <p class="report-state" data-report-state></p>
               </article>
+            </div>
+          </section>
+          <section class="reports-section waist-reports" aria-labelledby="waist-reports-title">
+            <h2 id="waist-reports-title">Waist trend</h2>
+            <div class="waist-report" aria-live="polite">
+              <p id="waist-report-status" class="report-value">No waist measurements yet.</p>
+              <div id="waist-chart" class="waist-chart" aria-label="Waist measurements line graph"></div>
+              <p id="waist-report-summary" class="report-denominator"></p>
             </div>
           </section>
           <section class="reports-section" aria-labelledby="meal-reports-title">

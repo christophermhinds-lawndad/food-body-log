@@ -15,7 +15,6 @@ const forbiddenVisibleCopy = [
   "macros",
   "food grades",
   "goal weight",
-  "target weight",
   "weight-loss advice",
   "diet recommendations",
   "recommended diet",
@@ -38,9 +37,6 @@ const forbiddenVisibleCopy = [
   "off track",
   "should eat",
   "healthy choice",
-  "weight loss",
-  "eating more",
-  "weight gain",
   "changes are needed",
 ];
 
@@ -64,13 +60,14 @@ const requiredCalmCopy = [
 ];
 
 const requiredReportCopy = [
-  "Weight notice: Saved entries are higher across some periods.",
-  "Weight notice: Saved entries are lower across some periods.",
-  "Weight notice: Saved entries are holding near the recent range.",
-  "These numbers are for observation only; no action is required here.",
+  "Consider eating slightly more, you may be losing weight at an unsustainable rate.",
+  "You are currently gaining weight. Spend time reflecting on your recent statistics around hunger and satiety and review recent food choices.",
+  "You are currently losing weight at a sustainable rate. Keep up the good work!",
+  "You are currently maintaining your weight. Unless you are at your target weight, slight adjustments around hunger, satiety, and meal planning will be necessary to move the needle.",
+  "Waist trend",
   "Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.",
   "Based on {count} weight entry/entries in this period.",
-  "Based on {denominator} logged meal level entry/entries.",
+  "Average rating of {average}, across {denominator} logged meal/meals.",
 ];
 
 test("whole-app runtime copy excludes diet scoring pressure and shame framing", () => {
@@ -96,7 +93,7 @@ test("calm status and backup caveat copy is present for missing skipped invalid 
   assert.doesNotMatch(normalizedRuntimeCopy, /\b(upload|cloud sync|server restore|remote storage|analytics|account backup)\b/);
 });
 
-test("report copy keeps numeric summaries without advice or outcome pressure", () => {
+test("report copy keeps numeric summaries without scoring or shame pressure", () => {
   for (const copy of requiredReportCopy) {
     assert.match(historyReportsSource + html, new RegExp(escapeRegExp(copy)), `missing Reports copy: ${copy}`);
   }

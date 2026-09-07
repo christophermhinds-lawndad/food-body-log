@@ -51,22 +51,27 @@ const requiredReportsCopy = [
   "Weight averages",
   "Current 7 day average",
   "Previous 7 day average",
-  "Trailing 30 days",
-  "Trailing 90 days",
+  "Average 30 days ago",
+  "Average 90 days ago",
   "Based on {count} weight entry/entries in this period.",
   "No weight data for this period.",
   "Not Enough Data Yet",
   "Add a weight entry to begin weight summaries.",
   "Not enough data yet to compare your current trailing 7 day average with the prior trailing 7 day average.",
-  "Not enough data yet to compare your current trailing 7 day average with trailing 30 and 90 day averages.",
-  "Weight notice: Saved entries are higher across some periods. These numbers are for observation only; no action is required here.",
-  "Weight notice: Saved entries are lower across some periods. These numbers are for observation only; no action is required here.",
-  "Weight notice: Saved entries are lower outside the recent comparison range. These numbers are for observation only; no action is required here.",
-  "Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.",
+  "Not enough data yet to compare your current trailing 7 day average with 30 and 90 day snapshots.",
+  "Consider eating slightly more, you may be losing weight at an unsustainable rate. Weight loss that is too rapid can trigger metabolic and hunger regulation issues in some people.",
+  "You are currently gaining weight. Spend time reflecting on your recent statistics around hunger and satiety and review recent food choices. Could you be waiting until you are hungrier to eat a meal? Are you often eating past neutral or moderate satiety? Are you eating a lot of ultra-processed foods? Or are you often eating food outside your plan?",
+  "You are currently losing weight at a sustainable rate. Keep up the good work!",
+  "You are currently maintaining your weight. Unless you are at your target weight, slight adjustments around hunger, satiety, and meal planning will be necessary to move the needle. Review your statistics and work on optimizing your current habits.",
+  "Waist trend",
+  "Latest waist measurements",
+  "No waist measurements yet.",
+  "One waist measurement saved. Add more measurements to see a waist trend.",
+  "Waist changed by {delta} inches across the displayed entries.",
   "Meal metrics",
   "Hunger Level",
   "Satiety Level",
-  "Based on {denominator} logged meal level entry/entries.",
+  "Average rating of {average}, across {denominator} logged meal/meals.",
   "No logged meal levels for this period.",
   "Not enough logged data yet. Logged meal levels will count here.",
 ];
@@ -79,9 +84,8 @@ const forbiddenSourcePatterns = [
   /\bCacheStorage\b/,
   /\bhttps?:\/\//,
   /\bapi\/|backend|analytics|node_modules|package\.json|child_process|exec\(/i,
-  /\bcanvas\b|\bsvg\b|\bchart\b|\bsparkline\b|\btrendline\b|\bheatmap\b/i,
-  /\btrend(?:ing)?\b|\bimproving\b|\bworsening\b|\bon track\b|\boff track\b/i,
-  /\bgoal\b|\btarget\b|\bsuccess\b|\bfailure\b|\bstreak\b|\bperfect\b|\bcheat\b/i,
+  /\bcanvas\b|\bsparkline\b|\bheatmap\b/i,
+  /\bgoal\b|\bsuccess\b|\bfailure\b|\bstreak\b|\bperfect\b|\bcheat\b/i,
   /\bbad food\b|\bgood food\b|\bcalories\b|\bmacros\b|\bdiet\b|\bweight-loss advice\b|\bmedical advice\b/i,
 ];
 
@@ -249,12 +253,14 @@ test("reports shell exposes fixed numeric groups and tile template", () => {
     "Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.",
     "Weight averages",
     "Weight summary",
-    "Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.",
+    "You are currently maintaining your weight. Unless you are at your target weight, slight adjustments around hunger, satiety, and meal planning will be necessary to move the needle. Review your statistics and work on optimizing your current habits.",
     "Meal metrics",
     "Current 7 day average",
     "Previous 7 day average",
-    "Trailing 30 days",
-    "Trailing 90 days",
+    "Average 30 days ago",
+    "Average 90 days ago",
+    "Waist trend",
+    "No waist measurements yet.",
     "Hunger Level",
     "Satiety Level",
   ]) {
@@ -262,7 +268,7 @@ test("reports shell exposes fixed numeric groups and tile template", () => {
   }
 
   assert.equal((reportsPanelHtml().match(/data-report-tile(?:\s|=)/g) || []).length, 6);
-  assert.doesNotMatch(reportsPanelHtml(), /<canvas\b|<svg\b|<table\b/i);
+  assert.doesNotMatch(reportsPanelHtml(), /<canvas\b|<table\b/i);
 });
 
 test("reports controller loads local DTOs and renders fixed sparse-safe tiles", () => {
@@ -273,6 +279,8 @@ test("reports controller loads local DTOs and renders fixed sparse-safe tiles", 
     "renderReportsState",
     "renderWeightSummary",
     "renderWeightReportTile",
+    "renderWaistTrend",
+    "createWaistChart",
     "renderMealReportTile",
     "reportValueText",
     "reportDenominatorText",
@@ -286,6 +294,7 @@ test("reports controller loads local DTOs and renders fixed sparse-safe tiles", 
   assert.match(appSource, /requestID !== reportsLoadRequestID/);
   assert.match(reportsControllerSlice(), /state\.weightAverages/);
   assert.match(reportsControllerSlice(), /state\.weightSummary/);
+  assert.match(reportsControllerSlice(), /state\.waistTrend/);
   assert.match(reportsControllerSlice(), /state\.mealMetrics/);
   assert.match(reportsControllerSlice(), /REPORTS_COPY\.weightNoData/);
   assert.match(reportsControllerSlice(), /REPORTS_COPY\.weightNotEnoughData/);
@@ -310,6 +319,8 @@ test("reports styles provide numeric tile selectors and 390px wrapping backstops
     ".report-value",
     ".report-denominator",
     ".report-state",
+    ".waist-report",
+    ".waist-chart",
   ]) {
     assert.match(css, new RegExp(escapeRegExp(selector)), `missing ${selector} styles`);
   }
@@ -343,13 +354,13 @@ test("history reports and read-only states are not color-only", () => {
 });
 
 test("reports surface stays numeric-only with no visualizations framing or network calls", () => {
-  const forbiddenReportsCopy = /\b(?:trend|trending|improving|worsening|on track|off track|goal|target|success|failure|streak|perfect|cheat|bad food|good food|calories|macros|diet|weight-loss advice|medical advice)\b/i;
-  const forbiddenReportSource = /\b(?:fetch|XMLHttpRequest|sendBeacon|canvas|svg|chart|sparkline|trendline|heatmap|delta|goal|target|red|green)\b/i;
+  const forbiddenReportsCopy = /\b(?:on track|off track|success|failure|streak|perfect|cheat|bad food|good food|calories|macros|diet|weight-loss advice|medical advice)\b/i;
+  const forbiddenReportSource = /\b(?:fetch|XMLHttpRequest|sendBeacon|canvas|sparkline|heatmap|goal|red)\b/i;
 
-  assert.doesNotMatch(reportsPanelHtml(), /<canvas\b|<svg\b|<table\b/i);
+  assert.doesNotMatch(reportsPanelHtml(), /<canvas\b|<table\b/i);
   assert.doesNotMatch(reportsPanelHtml(), forbiddenReportsCopy);
   assert.doesNotMatch(reportsControllerSlice(), forbiddenReportSource);
-  assert.doesNotMatch(css, /\.report-[^{]*(?:red|green|delta|trend|goal|comparison)/i);
+  assert.doesNotMatch(css, /\.report-[^{]*(?:red|goal|comparison)/i);
   assert.doesNotMatch(historyReportsSource, /\b(?:fetch|XMLHttpRequest|sendBeacon|https?:\/\/|analytics|backend|api\/)\b/i);
 });
 

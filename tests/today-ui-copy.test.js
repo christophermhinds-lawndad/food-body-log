@@ -15,7 +15,6 @@ const forbiddenVisibleCopy = [
   "macros",
   "food grades",
   "goal weight",
-  "target weight",
   "weight-loss advice",
   "streaks",
   "perfect days",

@@ -812,6 +812,58 @@ p {
   line-height: 1.5;
 }
 
+.waist-report {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.waist-chart {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.waist-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.waist-chart-axis {
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.waist-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.waist-chart-point {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2.5;
+}
+
+.waist-chart-axis-label,
+.waist-chart-value,
+.waist-chart-date {
+  fill: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.waist-chart-value {
+  fill: var(--text);
+}
+
 .button-row:has([data-unskip-meal]:not([hidden])) {
   grid-template-columns: 1fr;
 }
@@ -1046,6 +1098,8 @@ p {
   .reports-section,
   .reports-grid,
   .report-card,
+  .waist-report,
+  .waist-chart,
   .support-panel,
   .weight-fields,
   .field-stack,
@@ -1080,6 +1134,7 @@ p {
   .reports-section,
   .reports-grid,
   .report-card,
+  .waist-report,
   .weight-fields,
   .scale-field,
   .backup-section,

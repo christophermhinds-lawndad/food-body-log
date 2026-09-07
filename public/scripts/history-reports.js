@@ -2,6 +2,7 @@ import { getLocalDayID, isEditableDay } from "./day-policy.js";
 import {
   MEAL_SLOTS,
   MEAL_STATES,
+  MEAL_LEVELS,
   applyLoggedMeal,
   applySkippedMeal,
   applyUnskippedMeal,
@@ -39,21 +40,27 @@ const WEIGHT_AVERAGE_TILE_DEFS = Object.freeze([
   },
   {
     id: "trailing30",
-    periodLabel: "Trailing 30 days",
-    kind: "trailing",
-    windowDays: 30,
-    requireElapsedCoverage: true,
+    periodLabel: "Average 30 days ago",
+    kind: "snapshot",
+    windowDays: 7,
+    startOffsetDays: -30,
+    endOffsetDays: -24,
   },
   {
     id: "trailing90",
-    periodLabel: "Trailing 90 days",
-    kind: "trailing",
-    windowDays: 90,
-    requireElapsedCoverage: true,
+    periodLabel: "Average 90 days ago",
+    kind: "snapshot",
+    windowDays: 7,
+    startOffsetDays: -90,
+    endOffsetDays: -84,
   },
 ]);
 const REPORT_MEAL_WINDOW_DAYS = 7;
 const LARGE_WEIGHT_CHANGE_THRESHOLD = 5;
+const WAIST_DISPLAY_ENTRY_LIMIT = 6;
+const WAIST_AXIS_MIN = 24;
+const WAIST_AXIS_MAX = 72;
+const WAIST_TREND_THRESHOLD = 0.5;
 const WEIGHT_STATUS_THRESHOLDS = Object.freeze({
   prior7: {
     sustainableMin: 0.25,
@@ -86,6 +93,7 @@ const UNAVAILABLE = Object.freeze({
   weight: null,
   answers: [],
   breakthroughs: [],
+  waistTrend: null,
   weightAverages: [],
   weightSummary: null,
   mealMetrics: [],
@@ -119,23 +127,31 @@ export const REPORTS_COPY = Object.freeze({
   weightHeading: "Weight averages",
   weightSevenDays: "Current 7 day average",
   weightPreviousSevenDays: "Previous 7 day average",
-  weightThirtyDays: "Trailing 30 days",
-  weightNinetyDays: "Trailing 90 days",
+  weightThirtyDays: "Average 30 days ago",
+  weightNinetyDays: "Average 90 days ago",
   weightDenominator: "Based on {count} weight entry/entries in this period.",
   weightNoData: "No weight data for this period.",
   weightNotEnoughData: "Not Enough Data Yet",
   weightSummaryNoData: "Add a weight entry to begin weight summaries.",
   weightSummaryPriorNoData: "Not enough data yet to compare your current trailing 7 day average with the prior trailing 7 day average.",
-  weightSummaryLongWindowNoData: "Not enough data yet to compare your current trailing 7 day average with trailing 30 and 90 day averages.",
-  weightReflect: "Weight notice: Saved entries are higher across some periods. These numbers are for observation only; no action is required here.",
-  weightProgressing: "Weight notice: Saved entries are lower across some periods. These numbers are for observation only; no action is required here.",
-  weightConsiderMore: "Weight notice: Saved entries are lower outside the recent comparison range. These numbers are for observation only; no action is required here.",
-  weightStable: "Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.",
+  weightSummaryLongWindowNoData: "Not enough data yet to compare your current trailing 7 day average with 30 and 90 day snapshots.",
+  weightReflect: "You are currently gaining weight. Spend time reflecting on your recent statistics around hunger and satiety and review recent food choices. Could you be waiting until you are hungrier to eat a meal? Are you often eating past neutral or moderate satiety? Are you eating a lot of ultra-processed foods? Or are you often eating food outside your plan?",
+  weightProgressing: "You are currently losing weight at a sustainable rate. Keep up the good work!",
+  weightConsiderMore: "Consider eating slightly more, you may be losing weight at an unsustainable rate. Weight loss that is too rapid can trigger metabolic and hunger regulation issues in some people.",
+  weightStable: "You are currently maintaining your weight. Unless you are at your target weight, slight adjustments around hunger, satiety, and meal planning will be necessary to move the needle. Review your statistics and work on optimizing your current habits.",
+  weightGainWaistDown: "You are currently gaining weight. However, your waist size is decreasing. It is possible that you are losing fat while also gaining muscle mass, which is a very good thing. Keep up the good work.",
+  weightLossWaistUp: "You are currently losing weight. However, your waist size is increasing. It is possible that your scale is malfunctioning, or you are not tracking weight in a consistent manner (e.g. first thing in the morning daily, with no clothes on). Review your statistics and work on optimizing your current habits.",
+  weightStableWaistUp: "You are currently maintaining your weight. However, your waist size is increasing. It is possible that your scale is malfunctioning, or you are not tracking weight in a consistent manner (e.g. first thing in the morning daily, with no clothes on). Review your statistics and work on optimizing your current habits.",
+  waistHeading: "Waist trend",
+  waistLabel: "Latest waist measurements",
+  waistNoData: "No waist measurements yet.",
+  waistOneEntry: "One waist measurement saved. Add more measurements to see a waist trend.",
+  waistTrendSummary: "Waist changed by {delta} inches across the displayed entries.",
   mealHeading: "Meal metrics",
   mealSevenDays: "Trailing 7 days",
   hungryLabel: "Hunger Level",
   enoughLabel: "Satiety Level",
-  mealDenominator: "Based on {denominator} logged meal level entry/entries.",
+  mealDenominator: "Average rating of {average}, across {denominator} logged meal/meals.",
   mealNoData: "No logged meal levels for this period.",
   mealInsufficient: "Not enough logged data yet. Logged meal levels will count here.",
 });
@@ -272,6 +288,7 @@ export async function getReportsState(options = {}) {
       status: "Ready",
       weightAverages: summarizeWeightAverages(weights, options),
       weightSummary: summarizeWeightChange(weights, options),
+      waistTrend: summarizeWaistTrend(weights, options),
       mealMetrics: [
         summarizeMealMetric(meals, "ateWhenHungry", options),
         summarizeMealMetric(meals, "stoppedAtEnough", options),
@@ -292,16 +309,18 @@ export function summarizeWeightAverages(weights, options = {}) {
       count: summary.count,
       average: summary.average,
       formattedAverage: formatWeightAverage(summary.average),
-      display: tileDef.displayWhenNotEnoughData || summary.state !== "NotEnoughData",
+      display: tileDef.displayWhenNotEnoughData || summary.state === "Ready",
     };
   });
 }
 
 export function summarizeWeightChange(weights, options = {}) {
   const current7 = averageForTrailingWindow(weights, 7, options);
-  const prior7 = averageForDayRange(weights, addDays(getLocalDayID(options.now || new Date()), -13), addDays(getLocalDayID(options.now || new Date()), -7));
-  const trailing30 = averageForTrailingWindow(weights, 30, options, { requireFullWindow: true });
-  const trailing90 = averageForTrailingWindow(weights, 90, options, { requireFullWindow: true });
+  const todayID = getLocalDayID(options.now || new Date());
+  const prior7 = averageForDayRange(validWeightRecords(weights), addDays(todayID, -13), addDays(todayID, -7));
+  const snapshot30 = averageForDayRange(validWeightRecords(weights), addDays(todayID, -30), addDays(todayID, -24));
+  const snapshot90 = averageForDayRange(validWeightRecords(weights), addDays(todayID, -90), addDays(todayID, -84));
+  const waistTrend = summarizeWaistTrend(weights, options);
 
   if (current7.state !== "Ready") {
     return {
@@ -313,21 +332,21 @@ export function summarizeWeightChange(weights, options = {}) {
   }
 
   const priorComparison = createWeightComparison("prior7", current7.average, prior7.average);
-  const trailing30Comparison = createWeightComparison("trailing30", current7.average, trailing30.average);
-  const trailing90Comparison = createWeightComparison("trailing90", current7.average, trailing90.average);
+  const trailing30Comparison = createWeightComparison("trailing30", current7.average, snapshot30.average);
+  const trailing90Comparison = createWeightComparison("trailing90", current7.average, snapshot90.average);
   const comparisons = [priorComparison, trailing30Comparison, trailing90Comparison].filter(Boolean);
   const lines = [
     priorComparison
       ? `Your current trailing 7 day average is ${comparisonPhrase(priorComparison)} your 7 day trailing average from a week ago by ${formatSignedMagnitude(priorComparison.delta)} pounds, ${formatPercent(priorComparison.percent)}% of mass.`
       : REPORTS_COPY.weightSummaryPriorNoData,
     trailing30Comparison && trailing90Comparison
-      ? `The current trailing 7 day average is ${comparisonDirectionText(trailing30Comparison)} by ${formatSignedMagnitude(trailing30Comparison.delta)} pounds, ${formatPercent(trailing30Comparison.percent)}% of total mass, compared to the trailing 30 day average, and ${comparisonDirectionText(trailing90Comparison)} by ${formatSignedMagnitude(trailing90Comparison.delta)} pounds, ${formatPercent(trailing90Comparison.percent)}% of total mass, compared to the 90 day average.`
+      ? `The current trailing 7 day average is ${comparisonDirectionText(trailing30Comparison)} by ${formatSignedMagnitude(trailing30Comparison.delta)} pounds, ${formatPercent(trailing30Comparison.percent)}% of total mass, compared to the average 30 days ago, and ${comparisonDirectionText(trailing90Comparison)} by ${formatSignedMagnitude(trailing90Comparison.delta)} pounds, ${formatPercent(trailing90Comparison.percent)}% of total mass, compared to the average 90 days ago.`
       : REPORTS_COPY.weightSummaryLongWindowNoData,
   ];
 
   return {
     status: "Ready",
-    notice: weightNoticeForComparisons(comparisons),
+    notice: weightNoticeForComparisons(comparisons, waistTrend),
     lines,
     comparisons,
   };
@@ -354,6 +373,51 @@ export function summarizeMealMetric(meals, metricName, options = {}) {
     denominator,
     average,
     formattedAverage: formatWeightAverage(average),
+    qualitativeText: qualitativeMealMetricText(metricName, average),
+    averageSummary: mealMetricAverageSummary(average, denominator),
+  };
+}
+
+export function summarizeWaistTrend(weights, options = {}) {
+  const entries = validWaistRecords(weights)
+    .sort((left, right) => left.dayID.localeCompare(right.dayID))
+    .slice(-WAIST_DISPLAY_ENTRY_LIMIT);
+
+  if (entries.length === 0) {
+    return {
+      status: "NoData",
+      entries: [],
+      entryCount: 0,
+      direction: "stable",
+      delta: null,
+      formattedDelta: "",
+      axisMin: WAIST_AXIS_MIN,
+      axisMax: WAIST_AXIS_MAX,
+      summaryText: REPORTS_COPY.waistNoData,
+    };
+  }
+
+  const values = entries.map((entry) => entry.value);
+  const delta = entries.length > 1 ? roundOneDecimal(entries.at(-1).value - entries[0].value) : null;
+  const direction = delta == null || Math.abs(delta) < WAIST_TREND_THRESHOLD
+    ? "stable"
+    : delta > 0 ? "increasing" : "decreasing";
+  const axisMin = Math.min(WAIST_AXIS_MIN, ...values);
+  const axisMax = Math.max(WAIST_AXIS_MAX, ...values);
+  const summaryText = entries.length === 1
+    ? REPORTS_COPY.waistOneEntry
+    : REPORTS_COPY.waistTrendSummary.replace("{delta}", formatSignedMagnitude(delta));
+
+  return {
+    status: "Ready",
+    entries,
+    entryCount: entries.length,
+    direction,
+    delta,
+    formattedDelta: delta == null ? "" : formatWeightAverage(delta),
+    axisMin,
+    axisMax,
+    summaryText,
   };
 }
 
@@ -590,12 +654,23 @@ function averageForTrailingWindow(weights, windowDays, options = {}, config = {}
 }
 
 function averageForWeightTile(weights, tileDef, options = {}) {
+  const validWeights = validWeightRecords(weights);
+
   if (tileDef.kind === "previousTrailing") {
     const todayID = getLocalDayID(options.now || new Date());
     return averageForDayRange(
-      validWeightRecords(weights),
+      validWeights,
       addDays(todayID, -13),
       addDays(todayID, -7),
+    );
+  }
+
+  if (tileDef.kind === "snapshot") {
+    const todayID = getLocalDayID(options.now || new Date());
+    return averageForDayRange(
+      validWeights,
+      addDays(todayID, tileDef.startOffsetDays),
+      addDays(todayID, tileDef.endOffsetDays),
     );
   }
 
@@ -624,6 +699,15 @@ function validWeightRecords(weights) {
     .filter((weight) => weight?.dayID && normalizeWeightValue(weight?.value) != null);
 }
 
+function validWaistRecords(weights) {
+  return (Array.isArray(weights) ? weights : [])
+    .map((weight) => ({
+      dayID: weight?.dayID,
+      value: normalizeWaistValue(weight?.waist),
+    }))
+    .filter((weight) => weight.dayID && weight.value != null);
+}
+
 function hasBackdatedCoverage(weights, startDayID) {
   return validWeightRecords(weights).some((weight) => weight.dayID <= startDayID);
 }
@@ -645,12 +729,12 @@ function createWeightComparison(id, currentAverage, comparisonAverage) {
   };
 }
 
-function weightNoticeForComparisons(comparisons) {
+function weightNoticeForComparisons(comparisons, waistTrend = null) {
   const evaluable = comparisons.filter((comparison) =>
     Number.isFinite(comparison.percent) && WEIGHT_STATUS_THRESHOLDS[comparison.id]);
 
   if (evaluable.some((comparison) => comparison.percent < -WEIGHT_STATUS_THRESHOLDS[comparison.id].fastLoss)) {
-    return createWeightNotice("ConsiderEatingMore", REPORTS_COPY.weightConsiderMore);
+    return waistAdjustedWeightNotice(createWeightNotice("ConsiderEatingMore", REPORTS_COPY.weightConsiderMore), waistTrend);
   }
 
   const meaningfulGainCount = evaluable.filter((comparison) =>
@@ -659,7 +743,7 @@ function weightNoticeForComparisons(comparisons) {
     comparison.percent >= WEIGHT_STATUS_THRESHOLDS[comparison.id].strongGain);
 
   if (hasStrongGain || meaningfulGainCount >= 2) {
-    return createWeightNotice("Reflect", REPORTS_COPY.weightReflect);
+    return waistAdjustedWeightNotice(createWeightNotice("Reflect", REPORTS_COPY.weightReflect), waistTrend);
   }
 
   const sustainableLossCount = evaluable.filter((comparison) => {
@@ -670,10 +754,30 @@ function weightNoticeForComparisons(comparisons) {
   }).length;
 
   if (sustainableLossCount >= 2) {
-    return createWeightNotice("Progressing", REPORTS_COPY.weightProgressing);
+    return waistAdjustedWeightNotice(createWeightNotice("Progressing", REPORTS_COPY.weightProgressing), waistTrend);
   }
 
-  return createWeightNotice("Stable", REPORTS_COPY.weightStable);
+  return waistAdjustedWeightNotice(createWeightNotice("Stable", REPORTS_COPY.weightStable), waistTrend);
+}
+
+function waistAdjustedWeightNotice(notice, waistTrend) {
+  if (!waistTrend || waistTrend.entryCount < 2) {
+    return notice;
+  }
+
+  if (notice.kind === "Reflect" && waistTrend.direction === "decreasing") {
+    return createWeightNotice("Progressing", REPORTS_COPY.weightGainWaistDown);
+  }
+
+  if ((notice.kind === "Progressing" || notice.kind === "ConsiderEatingMore") && waistTrend.direction === "increasing") {
+    return createWeightNotice("Reflect", REPORTS_COPY.weightLossWaistUp);
+  }
+
+  if (notice.kind === "Stable" && waistTrend.direction === "increasing") {
+    return createWeightNotice("Reflect", REPORTS_COPY.weightStableWaistUp);
+  }
+
+  return notice;
 }
 
 function createWeightNotice(kind, text) {
@@ -713,6 +817,31 @@ function formatSignedMagnitude(value) {
 
 function formatPercent(value) {
   return formatWeightAverage(Math.abs(value));
+}
+
+function qualitativeMealMetricText(metricName, average) {
+  if (average == null) {
+    return REPORTS_COPY.mealNoData;
+  }
+
+  const descriptor = closestMealLevelDescriptor(average);
+  return metricName === "stoppedAtEnough"
+    ? `On average, your satiety levels over the last 7 days have been ${descriptor} after taking a meal.`
+    : `On average, your hunger levels over the last 7 days have been ${descriptor} when eating.`;
+}
+
+function closestMealLevelDescriptor(average) {
+  const roundedValue = Math.min(4, Math.max(0, Math.round(average)));
+  return MEAL_LEVELS.find((level) => level.value === roundedValue)?.descriptor || mealLevelLabel(roundedValue);
+}
+
+function mealMetricAverageSummary(average, denominator) {
+  const averageCopy = average == null ? "no data" : formatWeightAverage(average);
+  const noun = denominator === 1 ? "meal" : "meals";
+  return REPORTS_COPY.mealDenominator
+    .replace("{average}", averageCopy)
+    .replace("{denominator}", String(denominator))
+    .replace("meal/meals", noun);
 }
 
 function getPriorWeight(db, dayID) {

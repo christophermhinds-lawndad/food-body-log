@@ -247,11 +247,12 @@ function seedMeal(db, dayID, slot, overrides = {}) {
   });
 }
 
-function seedWeight(db, dayID, value) {
+function seedWeight(db, dayID, value, overrides = {}) {
   seedRecord(db, "weights", {
     dayID,
     value,
     updatedAt: `${dayID}T07:30:00.000Z`,
+    ...overrides,
   });
 }
 
@@ -431,12 +432,12 @@ test("history weight save reuses Today large-change confirmation before updating
   assert.equal(recordsByKey(db, "weights")[EDITABLE_DAY_ID].value, 190.2);
 });
 
-test("reports expose trailing weight averages and sparse meal metric states", async () => {
+test("reports expose snapshot weight averages waist trends and qualitative meal metric states", async () => {
   const { db, historyReports } = await loadModules("reports-state");
-  seedWeight(db, "2026-07-18", 186);
-  seedWeight(db, "2026-07-17", 184);
-  seedWeight(db, "2026-07-12", 180);
-  seedWeight(db, "2026-06-30", 178);
+  seedWeight(db, "2026-07-18", 186, { waist: 42 });
+  seedWeight(db, "2026-07-17", 184, { waist: 42.2 });
+  seedWeight(db, "2026-07-12", 180, { waist: 42.4 });
+  seedWeight(db, "2026-06-20", 178, { waist: 42.8 });
   seedMeal(db, "2026-07-18", "breakfast", {
     logState: "logged",
     ateWhenHungry: "yes",
@@ -462,33 +463,48 @@ test("reports expose trailing weight averages and sparse meal metric states", as
   const oneMeal = historyReports.summarizeMealMetric([
     { dayID: "2026-07-18", logState: "logged", ateWhenHungry: "yes" },
   ], "ateWhenHungry", { now: FIXED_NOW });
+  const noWaist = historyReports.summarizeWaistTrend([], { now: FIXED_NOW });
   const state = await historyReports.getReportsState({ now: FIXED_NOW });
 
-  assert.deepEqual(noWeight.map((summary) => summary.state), ["NoData", "NoData", "NotEnoughData", "NotEnoughData"]);
+  assert.deepEqual(noWeight.map((summary) => summary.state), ["NoData", "NoData", "NoData", "NoData"]);
   assert.deepEqual(noWeight.map((summary) => summary.display), [true, true, false, false]);
   assert.equal(oneMeal.state, "Ready");
   assert.equal(oneMeal.average, 3);
+  assert.equal(oneMeal.qualitativeText, "On average, your hunger levels over the last 7 days have been Distracting when eating.");
+  assert.equal(oneMeal.averageSummary, "Average rating of 3, across 1 logged meal.");
+  assert.equal(noWaist.summaryText, "No waist measurements yet.");
   assert.deepEqual(state.weightAverages.map((summary) => [summary.id, summary.windowDays, summary.state, summary.count, summary.average, summary.display]), [
     ["current7", 7, "Ready", 3, 183.3, true],
     ["previous7", 7, "NoData", 0, null, true],
-    ["trailing30", 30, "NotEnoughData", 4, null, false],
-    ["trailing90", 90, "NotEnoughData", 4, null, false],
+    ["trailing30", 7, "Ready", 1, 178, true],
+    ["trailing90", 7, "NoData", 0, null, false],
   ]);
   assert.deepEqual(state.weightAverages.map((summary) => summary.periodLabel), [
     "Current 7 day average",
     "Previous 7 day average",
-    "Trailing 30 days",
-    "Trailing 90 days",
+    "Average 30 days ago",
+    "Average 90 days ago",
   ]);
+  assert.deepEqual(state.waistTrend.entries.map((entry) => [entry.dayID, entry.value]), [
+    ["2026-06-20", 42.8],
+    ["2026-07-12", 42.4],
+    ["2026-07-17", 42.2],
+    ["2026-07-18", 42],
+  ]);
+  assert.equal(state.waistTrend.direction, "decreasing");
+  assert.equal(state.waistTrend.delta, -0.8);
+  assert.equal(state.waistTrend.summaryText, "Waist changed by 0.8 inches across the displayed entries.");
   assert.deepEqual(state.mealMetrics.map((summary) => [summary.metricName, summary.label, summary.state, summary.denominator, summary.average]), [
     ["ateWhenHungry", "Hunger Level", "Ready", 3, 2],
     ["stoppedAtEnough", "Satiety Level", "Ready", 2, 3],
   ]);
+  assert.equal(state.mealMetrics[0].qualitativeText, "On average, your hunger levels over the last 7 days have been Moderate when eating.");
+  assert.equal(state.mealMetrics[1].qualitativeText, "On average, your satiety levels over the last 7 days have been Distracting after taking a meal.");
   assert.equal(historyReports.formatWeightAverage(182), "182");
   assert.equal(historyReports.formatWeightAverage(183.3), "183.3");
 });
 
-test("weight average tile visibility uses elapsed date coverage instead of entry count", async () => {
+test("weight average tile visibility uses date-bound snapshot windows instead of entry count", async () => {
   const oldEnough = await loadModules("reports-weight-elapsed-old-enough");
   seedWeightRange(oldEnough.db, -31, -12, 200);
 
@@ -497,7 +513,7 @@ test("weight average tile visibility uses elapsed date coverage instead of entry
     ["current7", "NoData", true],
     ["previous7", "Ready", true],
     ["trailing30", "Ready", true],
-    ["trailing90", "NotEnoughData", false],
+    ["trailing90", "NoData", false],
   ]);
 
   const tooRecent = await loadModules("reports-weight-elapsed-too-recent");
@@ -507,15 +523,15 @@ test("weight average tile visibility uses elapsed date coverage instead of entry
   assert.deepEqual(tooRecentState.weightAverages.map((summary) => [summary.id, summary.state, summary.display]), [
     ["current7", "Ready", true],
     ["previous7", "Ready", true],
-    ["trailing30", "NotEnoughData", false],
-    ["trailing90", "NotEnoughData", false],
+    ["trailing30", "Ready", true],
+    ["trailing90", "NoData", false],
   ]);
 });
 
 test("weight report summary emits comparison narratives and threshold notices", async () => {
   const progressing = await loadModules("reports-progressing");
-  seedWeightRange(progressing.db, -89, -30, 205.5);
-  seedWeightRange(progressing.db, -29, -14, 198.85);
+  seedWeightRange(progressing.db, -90, -84, 202);
+  seedWeightRange(progressing.db, -30, -24, 195);
   seedWeightRange(progressing.db, -13, -7, 191.2);
   seedWeightRange(progressing.db, -6, 0, 190);
 
@@ -523,18 +539,18 @@ test("weight report summary emits comparison narratives and threshold notices", 
   assert.deepEqual(progressingState.weightAverages.map((summary) => [summary.id, summary.windowDays, summary.state, summary.average, summary.display]), [
     ["current7", 7, "Ready", 190, true],
     ["previous7", 7, "Ready", 191.2, true],
-    ["trailing30", 30, "Ready", 195, true],
-    ["trailing90", 90, "Ready", 202, true],
+    ["trailing30", 7, "Ready", 195, true],
+    ["trailing90", 7, "Ready", 202, true],
   ]);
   assert.equal(progressingState.weightSummary.notice.kind, "Progressing");
-  assert.equal(progressingState.weightSummary.notice.text, "Weight notice: Saved entries are lower across some periods. These numbers are for observation only; no action is required here.");
+  assert.equal(progressingState.weightSummary.notice.text, "You are currently losing weight at a sustainable rate. Keep up the good work!");
   assert.match(progressingState.weightSummary.lines[0], /lower than your 7 day trailing average from a week ago by 1\.2 pounds, 0\.6% of mass\./);
-  assert.match(progressingState.weightSummary.lines[1], /lower by 5 pounds, 2\.6% of total mass, compared to the trailing 30 day average/);
-  assert.match(progressingState.weightSummary.lines[1], /lower by 12 pounds, 5\.9% of total mass, compared to the 90 day average\./);
+  assert.match(progressingState.weightSummary.lines[1], /lower by 5 pounds, 2\.6% of total mass, compared to the average 30 days ago/);
+  assert.match(progressingState.weightSummary.lines[1], /lower by 12 pounds, 5\.9% of total mass, compared to the average 90 days ago\./);
 
   const flexibleProgressing = await loadModules("reports-flexible-progressing");
-  seedWeightRange(flexibleProgressing.db, -89, -30, 210);
-  seedWeightRange(flexibleProgressing.db, -29, -14, 204);
+  seedWeightRange(flexibleProgressing.db, -90, -84, 207.7);
+  seedWeightRange(flexibleProgressing.db, -30, -24, 202.6);
   seedWeightRange(flexibleProgressing.db, -13, -7, 202.4);
   seedWeightRange(flexibleProgressing.db, -6, 0, 200);
 
@@ -547,18 +563,18 @@ test("weight report summary emits comparison narratives and threshold notices", 
   assert.equal(flexibleProgressingState.weightSummary.notice.kind, "Progressing");
 
   const considerMore = await loadModules("reports-consider-more");
-  seedWeightRange(considerMore.db, -89, -30, 214);
-  seedWeightRange(considerMore.db, -29, -14, 214);
+  seedWeightRange(considerMore.db, -90, -84, 214);
+  seedWeightRange(considerMore.db, -30, -24, 214);
   seedWeightRange(considerMore.db, -13, -7, 205);
   seedWeightRange(considerMore.db, -6, 0, 190);
 
   const considerMoreState = await considerMore.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(considerMoreState.weightSummary.notice.kind, "ConsiderEatingMore");
-  assert.equal(considerMoreState.weightSummary.notice.text, "Weight notice: Saved entries are lower outside the recent comparison range. These numbers are for observation only; no action is required here.");
+  assert.equal(considerMoreState.weightSummary.notice.text, "Consider eating slightly more, you may be losing weight at an unsustainable rate. Weight loss that is too rapid can trigger metabolic and hunger regulation issues in some people.");
 
   const fastLossPriority = await loadModules("reports-fast-loss-priority");
-  seedWeightRange(fastLossPriority.db, -89, -30, 230);
-  seedWeightRange(fastLossPriority.db, -29, -14, 195);
+  seedWeightRange(fastLossPriority.db, -90, -84, 217.6);
+  seedWeightRange(fastLossPriority.db, -30, -24, 192.9);
   seedWeightRange(fastLossPriority.db, -13, -7, 191);
   seedWeightRange(fastLossPriority.db, -6, 0, 190);
 
@@ -571,18 +587,18 @@ test("weight report summary emits comparison narratives and threshold notices", 
   assert.equal(fastLossPriorityState.weightSummary.notice.kind, "ConsiderEatingMore");
 
   const reflect = await loadModules("reports-reflect");
-  seedWeightRange(reflect.db, -89, -30, 200);
-  seedWeightRange(reflect.db, -29, -14, 199);
+  seedWeightRange(reflect.db, -90, -84, 200);
+  seedWeightRange(reflect.db, -30, -24, 199);
   seedWeightRange(reflect.db, -13, -7, 200);
   seedWeightRange(reflect.db, -6, 0, 204);
 
   const reflectState = await reflect.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(reflectState.weightSummary.notice.kind, "Reflect");
-  assert.equal(reflectState.weightSummary.notice.text, "Weight notice: Saved entries are higher across some periods. These numbers are for observation only; no action is required here.");
+  assert.equal(reflectState.weightSummary.notice.text, "You are currently gaining weight. Spend time reflecting on your recent statistics around hunger and satiety and review recent food choices. Could you be waiting until you are hungrier to eat a meal? Are you often eating past neutral or moderate satiety? Are you eating a lot of ultra-processed foods? Or are you often eating food outside your plan?");
 
   const moderateGain = await loadModules("reports-moderate-gain");
-  seedWeightRange(moderateGain.db, -89, -30, 203);
-  seedWeightRange(moderateGain.db, -29, -14, 196);
+  seedWeightRange(moderateGain.db, -90, -84, 201.6);
+  seedWeightRange(moderateGain.db, -30, -24, 198.8);
   seedWeightRange(moderateGain.db, -13, -7, 201);
   seedWeightRange(moderateGain.db, -6, 0, 203);
 
@@ -595,14 +611,52 @@ test("weight report summary emits comparison narratives and threshold notices", 
   assert.equal(moderateGainState.weightSummary.notice.kind, "Reflect");
 
   const stable = await loadModules("reports-stable");
-  seedWeightRange(stable.db, -89, -30, 190);
-  seedWeightRange(stable.db, -29, -14, 190);
+  seedWeightRange(stable.db, -90, -84, 190);
+  seedWeightRange(stable.db, -30, -24, 190);
   seedWeightRange(stable.db, -13, -7, 190);
   seedWeightRange(stable.db, -6, 0, 190);
 
   const stableState = await stable.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(stableState.weightSummary.notice.kind, "Stable");
-  assert.equal(stableState.weightSummary.notice.text, "Weight notice: Saved entries are holding near the recent range. These numbers are for observation only; no action is required here.");
+  assert.equal(stableState.weightSummary.notice.text, "You are currently maintaining your weight. Unless you are at your target weight, slight adjustments around hunger, satiety, and meal planning will be necessary to move the needle. Review your statistics and work on optimizing your current habits.");
+});
+
+test("waist movement can replace weight notices when measurements conflict", async () => {
+  const gainingWithWaistDown = await loadModules("reports-waist-down");
+  seedWeightRange(gainingWithWaistDown.db, -90, -84, 200);
+  seedWeightRange(gainingWithWaistDown.db, -30, -24, 199);
+  seedWeightRange(gainingWithWaistDown.db, -13, -7, 200);
+  seedWeightRange(gainingWithWaistDown.db, -6, 0, 204);
+  seedWeight(gainingWithWaistDown.db, "2026-07-13", 204, { waist: 42 });
+  seedWeight(gainingWithWaistDown.db, "2026-07-18", 204, { waist: 41.3 });
+
+  const gainingWithWaistDownState = await gainingWithWaistDown.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.equal(gainingWithWaistDownState.weightSummary.notice.kind, "Progressing");
+  assert.equal(gainingWithWaistDownState.weightSummary.notice.text, "You are currently gaining weight. However, your waist size is decreasing. It is possible that you are losing fat while also gaining muscle mass, which is a very good thing. Keep up the good work.");
+
+  const losingWithWaistUp = await loadModules("reports-waist-up-losing");
+  seedWeightRange(losingWithWaistUp.db, -90, -84, 202);
+  seedWeightRange(losingWithWaistUp.db, -30, -24, 195);
+  seedWeightRange(losingWithWaistUp.db, -13, -7, 191.2);
+  seedWeightRange(losingWithWaistUp.db, -6, 0, 190);
+  seedWeight(losingWithWaistUp.db, "2026-07-13", 190, { waist: 41 });
+  seedWeight(losingWithWaistUp.db, "2026-07-18", 190, { waist: 41.7 });
+
+  const losingWithWaistUpState = await losingWithWaistUp.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.equal(losingWithWaistUpState.weightSummary.notice.kind, "Reflect");
+  assert.equal(losingWithWaistUpState.weightSummary.notice.text, "You are currently losing weight. However, your waist size is increasing. It is possible that your scale is malfunctioning, or you are not tracking weight in a consistent manner (e.g. first thing in the morning daily, with no clothes on). Review your statistics and work on optimizing your current habits.");
+
+  const stableWithWaistUp = await loadModules("reports-waist-up-stable");
+  seedWeightRange(stableWithWaistUp.db, -90, -84, 190);
+  seedWeightRange(stableWithWaistUp.db, -30, -24, 190);
+  seedWeightRange(stableWithWaistUp.db, -13, -7, 190);
+  seedWeightRange(stableWithWaistUp.db, -6, 0, 190);
+  seedWeight(stableWithWaistUp.db, "2026-07-13", 190, { waist: 41 });
+  seedWeight(stableWithWaistUp.db, "2026-07-18", 190, { waist: 41.6 });
+
+  const stableWithWaistUpState = await stableWithWaistUp.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.equal(stableWithWaistUpState.weightSummary.notice.kind, "Reflect");
+  assert.equal(stableWithWaistUpState.weightSummary.notice.text, "You are currently maintaining your weight. However, your waist size is increasing. It is possible that your scale is malfunctioning, or you are not tracking weight in a consistent manner (e.g. first thing in the morning daily, with no clothes on). Review your statistics and work on optimizing your current habits.");
 });
 
 test("history reports repository returns neutral unavailable results without IndexedDB", async () => {

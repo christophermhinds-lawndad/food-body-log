@@ -26,7 +26,7 @@ test("shell markup exposes all tabs with Today active by default", () => {
 
 test("shell uses relative app assets and install metadata", () => {
   assert.match(html, /href="\.\/styles\/app\.css"/);
-  assert.match(html, /src="\.\/scripts\/app\.js\?v=14"/);
+  assert.match(html, /src="\.\/scripts\/app\.js\?v=15"/);
   assert.match(html, /type="module"/);
   assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
   assert.match(html, /rel="apple-touch-icon" href="\.\/icons\/apple-touch-icon\.png"/);
@@ -132,6 +132,10 @@ test("reports shell exposes fixed numeric summary containers", () => {
   assert.match(html, /Numeric summaries use only saved local entries/);
   assert.match(html, /Current 7 day average/);
   assert.match(html, /Previous 7 day average/);
+  assert.match(html, /Average 30 days ago/);
+  assert.match(html, /Average 90 days ago/);
+  assert.match(html, /Waist trend/);
+  assert.match(html, /No waist measurements yet/);
   assert.equal((html.match(/data-report-tile(?:\s|=)/g) || []).length, 6);
 });
 
@@ -183,6 +187,8 @@ test("reports styling uses compact numeric cards without display-scale values", 
     ".report-value",
     ".report-denominator",
     ".report-state",
+    ".waist-report",
+    ".waist-chart",
   ]) {
     assert.match(css, new RegExp(escapeRegExp(selector)), `missing ${selector} styles`);
   }
@@ -190,7 +196,7 @@ test("reports styling uses compact numeric cards without display-scale values", 
   assert.match(css, /\.report-card[\s\S]*border-radius: 8px;[\s\S]*background: var\(--surface\);/);
   assert.match(css, /\.report-value[\s\S]*font-size: 16px;[\s\S]*font-weight: 600;/);
   assert.match(css, /reports overflow backstop/);
-  assert.doesNotMatch(css, /\.report-[^{]*(?:red|green|delta|trend|goal|comparison)/i);
+  assert.doesNotMatch(css, /\.report-[^{]*(?:red|goal|comparison)/i);
 });
 
 test("plan suggestion styling is compact, touch-friendly, and wrapping-safe", () => {
