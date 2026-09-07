@@ -22,7 +22,7 @@ export const MEAL_LEVELS = Object.freeze([
   Object.freeze({ value: 1, descriptor: "Neutral" }),
   Object.freeze({ value: 2, descriptor: "Moderate" }),
   Object.freeze({ value: 3, descriptor: "Distracting" }),
-  Object.freeze({ value: 4, descriptor: "Uncomfortable" }),
+  Object.freeze({ value: 4, descriptor: "Extreme" }),
 ]);
 
 const MEAL_LEVEL_BY_VALUE = new Map(MEAL_LEVELS.map((level) => [level.value, level]));

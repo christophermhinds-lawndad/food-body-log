@@ -14,8 +14,8 @@ import {
   normalizePlannedText,
   normalizeWaistValue,
   normalizeWeightValue,
-} from "./tracking-model.js?v=4";
-import { BREAKTHROUGH_STATES, JOURNAL_PROMPTS, createJournalAnswerRecord } from "./journal-model.js?v=3";
+} from "./tracking-model.js?v=5";
+import { BREAKTHROUGH_STATES, JOURNAL_PROMPTS, createJournalAnswerRecord } from "./journal-model.js?v=4";
 import { openAppDb } from "./storage.js";
 
 const DAYS_STORE = "days";

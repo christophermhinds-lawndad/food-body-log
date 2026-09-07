@@ -11,7 +11,7 @@
     <link rel="manifest" href="./manifest.webmanifest">
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
     <link rel="stylesheet" href="./styles/app.css">
-    <script type="module" src="./scripts/app.js?v=13"></script>
+    <script type="module" src="./scripts/app.js?v=14"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -30,6 +30,7 @@
                 <div class="field-stack">
                   <label class="field-label" for="weight-value">Today's weight</label>
                   <input id="weight-value" class="text-field" name="weight" type="number" inputmode="decimal" step="0.1" min="0">
+                  <p class="note">Weight is just one data point, not who you are.</p>
                 </div>
                 <div class="field-stack">
                   <label class="field-label" for="waist-value">Waist measurement</label>
@@ -37,7 +38,6 @@
                   <p class="note">Is today Saturday? Measure your waist!</p>
                 </div>
               </div>
-              <p class="note">Weight is just one data point. It is not a reflection of you.</p>
               <button class="primary-action compact-action" type="submit">Save measurements</button>
               <p id="weight-message" class="status-message" aria-live="polite">No measurements entered today.</p>
             </form>
@@ -69,7 +69,7 @@
                       <input type="range" name="breakfast-hungry" min="0" max="4" step="1" value="2" data-meal-level>
                       <output data-meal-level-output>Not selected</output>
                     </label>
-                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Extreme</p>
                   </fieldset>
                   <fieldset class="metric-group meal-scale-group">
                     <legend>Satiety Level</legend>
@@ -77,7 +77,7 @@
                       <input type="range" name="breakfast-enough" min="0" max="4" step="1" value="2" data-meal-level>
                       <output data-meal-level-output>Not selected</output>
                     </label>
-                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Extreme</p>
                   </fieldset>
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
@@ -105,7 +105,7 @@
                       <input type="range" name="lunch-hungry" min="0" max="4" step="1" value="2" data-meal-level>
                       <output data-meal-level-output>Not selected</output>
                     </label>
-                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Extreme</p>
                   </fieldset>
                   <fieldset class="metric-group meal-scale-group">
                     <legend>Satiety Level</legend>
@@ -113,7 +113,7 @@
                       <input type="range" name="lunch-enough" min="0" max="4" step="1" value="2" data-meal-level>
                       <output data-meal-level-output>Not selected</output>
                     </label>
-                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Extreme</p>
                   </fieldset>
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
@@ -141,7 +141,7 @@
                       <input type="range" name="dinner-hungry" min="0" max="4" step="1" value="2" data-meal-level>
                       <output data-meal-level-output>Not selected</output>
                     </label>
-                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Extreme</p>
                   </fieldset>
                   <fieldset class="metric-group meal-scale-group">
                     <legend>Satiety Level</legend>
@@ -149,7 +149,7 @@
                       <input type="range" name="dinner-enough" min="0" max="4" step="1" value="2" data-meal-level>
                       <output data-meal-level-output>Not selected</output>
                     </label>
-                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Extreme</p>
                   </fieldset>
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>
@@ -177,7 +177,7 @@
                       <input type="range" name="snack-hungry" min="0" max="4" step="1" value="2" data-meal-level>
                       <output data-meal-level-output>Not selected</output>
                     </label>
-                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Extreme</p>
                   </fieldset>
                   <fieldset class="metric-group meal-scale-group">
                     <legend>Satiety Level</legend>
@@ -185,7 +185,7 @@
                       <input type="range" name="snack-enough" min="0" max="4" step="1" value="2" data-meal-level>
                       <output data-meal-level-output>Not selected</output>
                     </label>
-                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Uncomfortable</p>
+                    <p class="scale-labels">0 None | 1 Neutral | 2 Moderate | 3 Distracting | 4 Extreme</p>
                   </fieldset>
                   <div class="button-row">
                     <button class="primary-action compact-action" type="submit">Log meal</button>

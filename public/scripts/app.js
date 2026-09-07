@@ -1,15 +1,15 @@
 import { createAppPaths } from "./paths.js";
 import { readSetupStatus, writeSetupStatus } from "./storage.js";
 import { renderStatusRows, setStatusText, setText } from "./dom.js";
-import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=13";
+import { CHECKING_STATUS_ROWS, CURRENT_CACHE_NAME, collectInstallStatus } from "./install-status.js?v=14";
 import { getTodayDayID, getTomorrowDayID } from "./day-policy.js";
-import { MEAL_ANSWERS, MEAL_LEVELS, MEAL_STATES, isMealLevelAnswered, mealLevelLabel, normalizeMealLevel } from "./tracking-model.js?v=4";
-import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=5";
+import { MEAL_ANSWERS, MEAL_LEVELS, MEAL_STATES, isMealLevelAnswered, mealLevelLabel, normalizeMealLevel } from "./tracking-model.js?v=5";
+import { getPlanState, getPlanSuggestions, getTodayTrackingState, saveMealLog, savePlan, saveWeight, skipMeal, unskipMeal } from "./today-tracking.js?v=6";
 import { createPlanSuggestionController } from "./plan-suggestions-ui.js?v=4";
-import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=3";
-import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough, getBreakthroughs } from "./journal-tracking.js?v=3";
-import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=4";
-import { createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText } from "./data-portability.js?v=4";
+import { JOURNAL_CHIPS, BREAKTHROUGH_STATES, OUTSIDE_PLAN_PROMPT_ID, promptsForMeals } from "./journal-model.js?v=4";
+import { getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough, getBreakthroughs } from "./journal-tracking.js?v=4";
+import { HISTORY_COPY, REPORTS_COPY, getHistoryDay, getHistoryState, getReportsState, saveHistoryDay } from "./history-reports.js?v=5";
+import { createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText } from "./data-portability.js?v=5";
 
 const appPaths = createAppPaths();
 

@@ -1,13 +1,13 @@
 import {
   MEAL_SLOTS,
-} from "./tracking-model.js?v=4";
+} from "./tracking-model.js?v=5";
 import {
   BREAKTHROUGH_STATES,
   OUTSIDE_PLAN_PROMPT,
   OUTSIDE_PLAN_PROMPT_ID,
   createJournalAnswerRecord,
   promptsForMeals,
-} from "./journal-model.js?v=3";
+} from "./journal-model.js?v=4";
 import { openAppDb } from "./storage.js";
 
 const DAYS_STORE = "days";

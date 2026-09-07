@@ -95,7 +95,7 @@ test("history markup starts with saved breakthroughs before collapsed history ac
 
 test("journal controller imports repository and wires load save breakthrough actions", () => {
   assert.match(appSource, /import \{ JOURNAL_CHIPS/);
-  assert.match(appSource, /from "\.\/journal-model\.js\?v=3"/);
+  assert.match(appSource, /from "\.\/journal-model\.js\?v=4"/);
   assert.match(appSource, /getJournalState, saveReflection, setAnswerBreakthrough, dropBreakthrough/);
   assert.match(appSource, /function updateJournalPromptsForOutsidePlanChoice\(\)/);
   assert.match(appSource, /OUTSIDE_PLAN_PROMPT_ID/);

@@ -124,7 +124,7 @@ test("safe DOM helper writes textContent and exposes no raw HTML insertion API",
 test("backup controller imports portability helpers and queries settings controls once", () => {
   assert.match(
     appSource,
-    /import \{ createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText \} from "\.\/data-portability\.js\?v=4";/,
+    /import \{ createDownloadSpec, exportLocalData, importLocalDataFromBackup, inspectBackupImport, parseBackupText \} from "\.\/data-portability\.js\?v=5";/,
   );
 
   for (const selector of [

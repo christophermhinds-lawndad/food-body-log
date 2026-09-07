@@ -11,7 +11,7 @@ import {
   normalizeWaistValue,
   normalizeWeightValue,
   rankPlannedTextSuggestions,
-} from "./tracking-model.js?v=4";
+} from "./tracking-model.js?v=5";
 import { openAppDb } from "./storage.js";
 
 const DAYS_STORE = "days";

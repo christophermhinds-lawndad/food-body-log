@@ -26,7 +26,7 @@ test("shell markup exposes all tabs with Today active by default", () => {
 
 test("shell uses relative app assets and install metadata", () => {
   assert.match(html, /href="\.\/styles\/app\.css"/);
-  assert.match(html, /src="\.\/scripts\/app\.js\?v=13"/);
+  assert.match(html, /src="\.\/scripts\/app\.js\?v=14"/);
   assert.match(html, /type="module"/);
   assert.match(html, /rel="manifest" href="\.\/manifest\.webmanifest"/);
   assert.match(html, /rel="apple-touch-icon" href="\.\/icons\/apple-touch-icon\.png"/);
@@ -52,7 +52,7 @@ test("today and plan shell expose the Phase 2 tracer surfaces", () => {
   }
 
   for (const copy of [
-    "Weight is just one data point. It is not a reflection of you.",
+    "Weight is just one data point, not who you are.",
     "Waist measurement",
     "Is today Saturday? Measure your waist!",
     "Save measurements",

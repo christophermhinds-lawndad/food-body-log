@@ -119,8 +119,8 @@ test("static guard tracks non-mutating browse and prior-day weight confirmation 
 test("copy guard scopes forbidden checks to the History Reports repository", () => {
   assert.match(historyReportsSource, /from "\.\/storage\.js"/);
   assert.match(historyReportsSource, /from "\.\/day-policy\.js"/);
-  assert.match(historyReportsSource, /from "\.\/tracking-model\.js\?v=4"/);
-  assert.match(historyReportsSource, /from "\.\/journal-model\.js\?v=3"/);
+  assert.match(historyReportsSource, /from "\.\/tracking-model\.js\?v=5"/);
+  assert.match(historyReportsSource, /from "\.\/journal-model\.js\?v=4"/);
   assert.doesNotMatch(historyReportsSource, /\.innerHTML\s*=|insertAdjacentHTML\s*\(|outerHTML\s*=/);
 });
 

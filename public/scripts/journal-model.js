@@ -3,7 +3,7 @@ import {
   MEAL_STATES,
   isHighSatietyLevel,
   isLowHungerLevel,
-} from "./tracking-model.js?v=4";
+} from "./tracking-model.js?v=5";
 
 export const OUTSIDE_PLAN_PROMPT_ID = "outside-plan-check";
 

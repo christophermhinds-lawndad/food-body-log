@@ -224,11 +224,11 @@ test("tracking model keeps fixed slots and state values distinct", async () => {
     [1, "Neutral"],
     [2, "Moderate"],
     [3, "Distracting"],
-    [4, "Uncomfortable"],
+    [4, "Extreme"],
   ]);
   assert.equal(model.normalizeMealLevel(model.MEAL_ANSWERS.yes), 3);
   assert.equal(model.normalizeMealLevel(model.MEAL_ANSWERS.no), 0);
-  assert.equal(model.mealLevelLabel(4), "4 - Uncomfortable");
+  assert.equal(model.mealLevelLabel(4), "4 - Extreme");
 
   const defaultMeal = model.createDefaultMeal(TODAY_ID, model.MEAL_SLOTS[0]);
   assert.equal(defaultMeal.plannedText, "");

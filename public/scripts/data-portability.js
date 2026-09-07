@@ -1,5 +1,5 @@
 import { openAppDb } from "./storage.js";
-import { JOURNAL_CHIPS, JOURNAL_PROMPTS, OUTSIDE_PLAN_PROMPT_ID } from "./journal-model.js?v=3";
+import { JOURNAL_CHIPS, JOURNAL_PROMPTS, OUTSIDE_PLAN_PROMPT_ID } from "./journal-model.js?v=4";
 
 const APP_ID = "food-body-log";
 const EXPORT_VERSION = 1;
