@@ -65,6 +65,7 @@ const requiredReportCopy = [
   "You are currently losing weight at a sustainable rate. Keep up the good work!",
   "You are currently maintaining your weight. Unless you are at your target weight, slight adjustments around hunger, satiety, and meal planning will be necessary to move the needle.",
   "Waist trend",
+  "Keep collecting data. The app will begin to provide guidance based on your trends once you have logged consistently for 30 days. You can still review your numbers below.",
   "Numeric summaries use only saved local entries. Sparse periods show when there is not enough data.",
   "Based on {count} weight entry/entries in this period.",
   "Average rating of {average}, across {denominator} logged meal/meals.",

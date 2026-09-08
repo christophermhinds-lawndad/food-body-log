@@ -57,6 +57,7 @@ const requiredReportsCopy = [
   "No weight data for this period.",
   "Not Enough Data Yet",
   "Add a weight entry to begin weight summaries.",
+  "Keep collecting data. The app will begin to provide guidance based on your trends once you have logged consistently for 30 days. You can still review your numbers below.",
   "Not enough data yet to compare your current trailing 7 day average with the prior trailing 7 day average.",
   "Not enough data yet to compare your current trailing 7 day average with 30 and 90 day snapshots.",
   "Consider eating slightly more, you may be losing weight at an unsustainable rate. Weight loss that is too rapid can trigger metabolic and hunger regulation issues in some people.",

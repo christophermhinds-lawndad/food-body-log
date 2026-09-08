@@ -133,6 +133,7 @@ export const REPORTS_COPY = Object.freeze({
   weightNoData: "No weight data for this period.",
   weightNotEnoughData: "Not Enough Data Yet",
   weightSummaryNoData: "Add a weight entry to begin weight summaries.",
+  weightSummaryCollectingData: "Keep collecting data. The app will begin to provide guidance based on your trends once you have logged consistently for 30 days. You can still review your numbers below.",
   weightSummaryPriorNoData: "Not enough data yet to compare your current trailing 7 day average with the prior trailing 7 day average.",
   weightSummaryLongWindowNoData: "Not enough data yet to compare your current trailing 7 day average with 30 and 90 day snapshots.",
   weightReflect: "You are currently gaining weight. Spend time reflecting on your recent statistics around hunger and satiety and review recent food choices. Could you be waiting until you are hungrier to eat a meal? Are you often eating past neutral or moderate satiety? Are you eating a lot of ultra-processed foods? Or are you often eating food outside your plan?",
@@ -315,17 +316,18 @@ export function summarizeWeightAverages(weights, options = {}) {
 }
 
 export function summarizeWeightChange(weights, options = {}) {
+  const validWeights = validWeightRecords(weights);
   const current7 = averageForTrailingWindow(weights, 7, options);
   const todayID = getLocalDayID(options.now || new Date());
-  const prior7 = averageForDayRange(validWeightRecords(weights), addDays(todayID, -13), addDays(todayID, -7));
-  const snapshot30 = averageForDayRange(validWeightRecords(weights), addDays(todayID, -30), addDays(todayID, -24));
-  const snapshot90 = averageForDayRange(validWeightRecords(weights), addDays(todayID, -90), addDays(todayID, -84));
+  const prior7 = averageForDayRange(validWeights, addDays(todayID, -13), addDays(todayID, -7));
+  const snapshot30 = averageForDayRange(validWeights, addDays(todayID, -30), addDays(todayID, -24));
+  const snapshot90 = averageForDayRange(validWeights, addDays(todayID, -90), addDays(todayID, -84));
   const waistTrend = summarizeWaistTrend(weights, options);
 
   if (current7.state !== "Ready") {
     return {
       status: "NoData",
-      notice: createWeightNotice("NoData", REPORTS_COPY.weightSummaryNoData),
+      notice: createWeightNotice("NoData", validWeights.length < 30 ? REPORTS_COPY.weightSummaryCollectingData : REPORTS_COPY.weightSummaryNoData),
       lines: [REPORTS_COPY.weightSummaryNoData],
       comparisons: [],
     };
@@ -343,10 +345,13 @@ export function summarizeWeightChange(weights, options = {}) {
       ? `The current trailing 7 day average is ${comparisonDirectionText(trailing30Comparison)} by ${formatSignedMagnitude(trailing30Comparison.delta)} pounds, ${formatPercent(trailing30Comparison.percent)}% of total mass, compared to the average 30 days ago, and ${comparisonDirectionText(trailing90Comparison)} by ${formatSignedMagnitude(trailing90Comparison.delta)} pounds, ${formatPercent(trailing90Comparison.percent)}% of total mass, compared to the average 90 days ago.`
       : REPORTS_COPY.weightSummaryLongWindowNoData,
   ];
+  const hasMinimumGuidanceHistory = validWeights.length >= 30;
 
   return {
     status: "Ready",
-    notice: weightNoticeForComparisons(comparisons, waistTrend),
+    notice: hasMinimumGuidanceHistory
+      ? weightNoticeForComparisons(comparisons, waistTrend)
+      : createWeightNotice("CollectingData", REPORTS_COPY.weightSummaryCollectingData),
     lines,
     comparisons,
   };

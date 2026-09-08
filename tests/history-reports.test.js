@@ -262,6 +262,11 @@ function seedWeightRange(db, startOffset, endOffset, value) {
   }
 }
 
+function seedGuidanceMinimumFillers(db, value = 200) {
+  seedWeight(db, dayIDFromOffset(-60), value);
+  seedWeight(db, dayIDFromOffset(-59), value);
+}
+
 function dayIDFromOffset(offset) {
   const date = new Date(FIXED_NOW);
   date.setDate(date.getDate() + offset);
@@ -534,6 +539,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
   seedWeightRange(progressing.db, -30, -24, 195);
   seedWeightRange(progressing.db, -13, -7, 191.2);
   seedWeightRange(progressing.db, -6, 0, 190);
+  seedGuidanceMinimumFillers(progressing.db);
 
   const progressingState = await progressing.historyReports.getReportsState({ now: FIXED_NOW });
   assert.deepEqual(progressingState.weightAverages.map((summary) => [summary.id, summary.windowDays, summary.state, summary.average, summary.display]), [
@@ -553,6 +559,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
   seedWeightRange(flexibleProgressing.db, -30, -24, 202.6);
   seedWeightRange(flexibleProgressing.db, -13, -7, 202.4);
   seedWeightRange(flexibleProgressing.db, -6, 0, 200);
+  seedGuidanceMinimumFillers(flexibleProgressing.db);
 
   const flexibleProgressingState = await flexibleProgressing.historyReports.getReportsState({ now: FIXED_NOW });
   assert.deepEqual(flexibleProgressingState.weightSummary.comparisons.map((comparison) => [comparison.id, comparison.percent]), [
@@ -567,6 +574,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
   seedWeightRange(considerMore.db, -30, -24, 214);
   seedWeightRange(considerMore.db, -13, -7, 205);
   seedWeightRange(considerMore.db, -6, 0, 190);
+  seedGuidanceMinimumFillers(considerMore.db);
 
   const considerMoreState = await considerMore.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(considerMoreState.weightSummary.notice.kind, "ConsiderEatingMore");
@@ -577,6 +585,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
   seedWeightRange(fastLossPriority.db, -30, -24, 192.9);
   seedWeightRange(fastLossPriority.db, -13, -7, 191);
   seedWeightRange(fastLossPriority.db, -6, 0, 190);
+  seedGuidanceMinimumFillers(fastLossPriority.db);
 
   const fastLossPriorityState = await fastLossPriority.historyReports.getReportsState({ now: FIXED_NOW });
   assert.deepEqual(fastLossPriorityState.weightSummary.comparisons.map((comparison) => [comparison.id, comparison.percent]), [
@@ -591,6 +600,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
   seedWeightRange(reflect.db, -30, -24, 199);
   seedWeightRange(reflect.db, -13, -7, 200);
   seedWeightRange(reflect.db, -6, 0, 204);
+  seedGuidanceMinimumFillers(reflect.db);
 
   const reflectState = await reflect.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(reflectState.weightSummary.notice.kind, "Reflect");
@@ -601,6 +611,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
   seedWeightRange(moderateGain.db, -30, -24, 198.8);
   seedWeightRange(moderateGain.db, -13, -7, 201);
   seedWeightRange(moderateGain.db, -6, 0, 203);
+  seedGuidanceMinimumFillers(moderateGain.db);
 
   const moderateGainState = await moderateGain.historyReports.getReportsState({ now: FIXED_NOW });
   assert.deepEqual(moderateGainState.weightSummary.comparisons.map((comparison) => [comparison.id, comparison.percent]), [
@@ -615,6 +626,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
   seedWeightRange(stable.db, -30, -24, 190);
   seedWeightRange(stable.db, -13, -7, 190);
   seedWeightRange(stable.db, -6, 0, 190);
+  seedGuidanceMinimumFillers(stable.db);
 
   const stableState = await stable.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(stableState.weightSummary.notice.kind, "Stable");
@@ -627,6 +639,7 @@ test("waist movement can replace weight notices when measurements conflict", asy
   seedWeightRange(gainingWithWaistDown.db, -30, -24, 199);
   seedWeightRange(gainingWithWaistDown.db, -13, -7, 200);
   seedWeightRange(gainingWithWaistDown.db, -6, 0, 204);
+  seedGuidanceMinimumFillers(gainingWithWaistDown.db);
   seedWeight(gainingWithWaistDown.db, "2026-07-13", 204, { waist: 42 });
   seedWeight(gainingWithWaistDown.db, "2026-07-18", 204, { waist: 41.3 });
 
@@ -639,6 +652,7 @@ test("waist movement can replace weight notices when measurements conflict", asy
   seedWeightRange(losingWithWaistUp.db, -30, -24, 195);
   seedWeightRange(losingWithWaistUp.db, -13, -7, 191.2);
   seedWeightRange(losingWithWaistUp.db, -6, 0, 190);
+  seedGuidanceMinimumFillers(losingWithWaistUp.db);
   seedWeight(losingWithWaistUp.db, "2026-07-13", 190, { waist: 41 });
   seedWeight(losingWithWaistUp.db, "2026-07-18", 190, { waist: 41.7 });
 
@@ -651,12 +665,37 @@ test("waist movement can replace weight notices when measurements conflict", asy
   seedWeightRange(stableWithWaistUp.db, -30, -24, 190);
   seedWeightRange(stableWithWaistUp.db, -13, -7, 190);
   seedWeightRange(stableWithWaistUp.db, -6, 0, 190);
+  seedGuidanceMinimumFillers(stableWithWaistUp.db);
   seedWeight(stableWithWaistUp.db, "2026-07-13", 190, { waist: 41 });
   seedWeight(stableWithWaistUp.db, "2026-07-18", 190, { waist: 41.6 });
 
   const stableWithWaistUpState = await stableWithWaistUp.historyReports.getReportsState({ now: FIXED_NOW });
   assert.equal(stableWithWaistUpState.weightSummary.notice.kind, "Reflect");
   assert.equal(stableWithWaistUpState.weightSummary.notice.text, "You are currently maintaining your weight. However, your waist size is increasing. It is possible that your scale is malfunctioning, or you are not tracking weight in a consistent manner (e.g. first thing in the morning daily, with no clothes on). Review your statistics and work on optimizing your current habits.");
+});
+
+test("weight report guidance waits for 30 saved weight days before trend notices", async () => {
+  const collecting = await loadModules("reports-collecting-data");
+  seedWeightRange(collecting.db, -30, -24, 195);
+  seedWeightRange(collecting.db, -13, -7, 191.2);
+  seedWeightRange(collecting.db, -6, 0, 190);
+
+  const collectingState = await collecting.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.equal(collectingState.weightSummary.notice.kind, "CollectingData");
+  assert.equal(collectingState.weightSummary.notice.text, "Keep collecting data. The app will begin to provide guidance based on your trends once you have logged consistently for 30 days. You can still review your numbers below.");
+  assert.deepEqual(collectingState.weightSummary.comparisons.map((comparison) => [comparison.id, comparison.percent]), [
+    ["prior7", -0.6],
+    ["trailing30", -2.6],
+  ]);
+
+  const ready = await loadModules("reports-guidance-ready");
+  seedWeightRange(ready.db, -30, -24, 195);
+  seedWeightRange(ready.db, -23, -14, 193);
+  seedWeightRange(ready.db, -13, -7, 191.2);
+  seedWeightRange(ready.db, -6, 0, 190);
+
+  const readyState = await ready.historyReports.getReportsState({ now: FIXED_NOW });
+  assert.equal(readyState.weightSummary.notice.kind, "Progressing");
 });
 
 test("history reports repository returns neutral unavailable results without IndexedDB", async () => {
