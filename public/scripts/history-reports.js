@@ -135,7 +135,8 @@ export const REPORTS_COPY = Object.freeze({
   weightSummaryNoData: "Add a weight entry to begin weight summaries.",
   weightSummaryCollectingData: "Keep collecting data. The app will begin to provide guidance based on your trends once you have logged consistently for 30 days. You can still review your numbers below.",
   weightSummaryPriorNoData: "Not enough data yet to compare your current trailing 7 day average with the prior trailing 7 day average.",
-  weightSummaryLongWindowNoData: "Not enough data yet to compare your current trailing 7 day average with 30 and 90 day snapshots.",
+  weightSummaryThirtyNoData: "Not enough data yet to compare your current trailing 7 day average with the average 30 days ago.",
+  weightSummaryNinetyNoData: "Keep collecting data to unlock your 90-day comparison.",
   weightReflect: "You are currently gaining weight. Spend time reflecting on your recent statistics around hunger and satiety and review recent food choices. Could you be waiting until you are hungrier to eat a meal? Are you often eating past neutral or moderate satiety? Are you eating a lot of ultra-processed foods? Or are you often eating food outside your plan?",
   weightProgressing: "You are currently losing weight at a sustainable rate. Keep up the good work!",
   weightConsiderMore: "Consider eating slightly more, you may be losing weight at an unsustainable rate. Weight loss that is too rapid can trigger metabolic and hunger regulation issues in some people.",
@@ -341,9 +342,12 @@ export function summarizeWeightChange(weights, options = {}) {
     priorComparison
       ? `Your current trailing 7 day average is ${comparisonPhrase(priorComparison)} your 7 day trailing average from a week ago by ${formatSignedMagnitude(priorComparison.delta)} pounds, ${formatPercent(priorComparison.percent)}% of mass.`
       : REPORTS_COPY.weightSummaryPriorNoData,
-    trailing30Comparison && trailing90Comparison
-      ? `The current trailing 7 day average is ${comparisonDirectionText(trailing30Comparison)} by ${formatSignedMagnitude(trailing30Comparison.delta)} pounds, ${formatPercent(trailing30Comparison.percent)}% of total mass, compared to the average 30 days ago, and ${comparisonDirectionText(trailing90Comparison)} by ${formatSignedMagnitude(trailing90Comparison.delta)} pounds, ${formatPercent(trailing90Comparison.percent)}% of total mass, compared to the average 90 days ago.`
-      : REPORTS_COPY.weightSummaryLongWindowNoData,
+    trailing30Comparison
+      ? `Your current trailing 7 day average is ${comparisonDirectionText(trailing30Comparison)} by ${formatSignedMagnitude(trailing30Comparison.delta)} pounds, ${formatPercent(trailing30Comparison.percent)}% of total mass, compared to the average 30 days ago.`
+      : REPORTS_COPY.weightSummaryThirtyNoData,
+    trailing90Comparison
+      ? `Your current trailing 7 day average is ${comparisonDirectionText(trailing90Comparison)} by ${formatSignedMagnitude(trailing90Comparison.delta)} pounds, ${formatPercent(trailing90Comparison.percent)}% of total mass, compared to the average 90 days ago.`
+      : REPORTS_COPY.weightSummaryNinetyNoData,
   ];
   const hasMinimumGuidanceHistory = validWeights.length >= 30;
 

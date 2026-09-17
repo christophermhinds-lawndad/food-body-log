@@ -552,7 +552,7 @@ test("weight report summary emits comparison narratives and threshold notices", 
   assert.equal(progressingState.weightSummary.notice.text, "You are currently losing weight at a sustainable rate. Keep up the good work!");
   assert.match(progressingState.weightSummary.lines[0], /lower than your 7 day trailing average from a week ago by 1\.2 pounds, 0\.6% of mass\./);
   assert.match(progressingState.weightSummary.lines[1], /lower by 5 pounds, 2\.6% of total mass, compared to the average 30 days ago/);
-  assert.match(progressingState.weightSummary.lines[1], /lower by 12 pounds, 5\.9% of total mass, compared to the average 90 days ago\./);
+  assert.match(progressingState.weightSummary.lines[2], /lower by 12 pounds, 5\.9% of total mass, compared to the average 90 days ago\./);
 
   const flexibleProgressing = await loadModules("reports-flexible-progressing");
   seedWeightRange(flexibleProgressing.db, -90, -84, 207.7);
@@ -652,6 +652,8 @@ test("consistent available weight loss does not require a 90 day comparison", as
   assert.equal(state.waistTrend.delta, -0.5);
   assert.equal(state.weightSummary.notice.kind, "Progressing");
   assert.equal(state.weightSummary.notice.text, "You are currently losing weight at a sustainable rate. Keep up the good work!");
+  assert.match(state.weightSummary.lines[1], /lower by 1\.1 pounds, 0\.5% of total mass, compared to the average 30 days ago\./);
+  assert.equal(state.weightSummary.lines[2], "Keep collecting data to unlock your 90-day comparison.");
 });
 
 test("waist movement can replace weight notices when measurements conflict", async () => {
