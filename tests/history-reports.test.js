@@ -633,6 +633,27 @@ test("weight report summary emits comparison narratives and threshold notices", 
   assert.equal(stableState.weightSummary.notice.text, "You are currently maintaining your weight. Unless you are at your target weight, slight adjustments around hunger, satiety, and meal planning will be necessary to move the needle. Review your statistics and work on optimizing your current habits.");
 });
 
+test("consistent available weight loss does not require a 90 day comparison", async () => {
+  const recentLoss = await loadModules("reports-recent-loss-without-90-day-data");
+  seedWeightRange(recentLoss.db, -30, -24, 220);
+  seedWeightRange(recentLoss.db, -23, -15, 220);
+  seedWeightRange(recentLoss.db, -13, -7, 219.6);
+  seedWeightRange(recentLoss.db, -6, 0, 218.9);
+  seedWeight(recentLoss.db, dayIDFromOffset(-6), 218.9, { waist: 40 });
+  seedWeight(recentLoss.db, dayIDFromOffset(0), 218.9, { waist: 39.5 });
+
+  const state = await recentLoss.historyReports.getReportsState({ now: FIXED_NOW });
+
+  assert.deepEqual(state.weightSummary.comparisons.map((comparison) => [comparison.id, comparison.delta, comparison.percent]), [
+    ["prior7", -0.7, -0.3],
+    ["trailing30", -1.1, -0.5],
+  ]);
+  assert.equal(state.waistTrend.direction, "decreasing");
+  assert.equal(state.waistTrend.delta, -0.5);
+  assert.equal(state.weightSummary.notice.kind, "Progressing");
+  assert.equal(state.weightSummary.notice.text, "You are currently losing weight at a sustainable rate. Keep up the good work!");
+});
+
 test("waist movement can replace weight notices when measurements conflict", async () => {
   const gainingWithWaistDown = await loadModules("reports-waist-down");
   seedWeightRange(gainingWithWaistDown.db, -90, -84, 200);

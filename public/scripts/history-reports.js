@@ -757,8 +757,12 @@ function weightNoticeForComparisons(comparisons, waistTrend = null) {
 
     return lossPercent >= threshold.sustainableMin && lossPercent <= threshold.sustainableMax;
   }).length;
+  const availableLossCount = evaluable.filter((comparison) => comparison.percent < 0).length;
+  const hasConsistentAvailableLoss = sustainableLossCount >= 1
+    && availableLossCount >= 2
+    && availableLossCount === evaluable.length;
 
-  if (sustainableLossCount >= 2) {
+  if (sustainableLossCount >= 2 || hasConsistentAvailableLoss) {
     return waistAdjustedWeightNotice(createWeightNotice("Progressing", REPORTS_COPY.weightProgressing), waistTrend);
   }
 
